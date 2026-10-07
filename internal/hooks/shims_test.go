@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -47,6 +48,9 @@ func TestShimsAreValidShAndManaged(t *testing.T) {
 // reference-transaction fires for every ref update in every git command, so
 // unless a push is marked it must hand off to the user's hook untouched.
 func TestReferenceTransactionFastPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("running shims under Git for Windows is verified in Phase 3")
+	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {
 		t.Skip("no sh")

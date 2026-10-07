@@ -17,8 +17,9 @@ func newPlayCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 		Use:   "play <commit|push>",
 		Short: "Play an event's sound now, to test setup",
 		Long: `Play the sound configured for an event, without committing or pushing.
-Plays even if the event (or jingle) is turned off; the result reports
-"enabled" so you can tell whether it would play on a real commit or push.
+Plays even if the event (or jingle) is turned off, and ignores the
+cooldown; the result reports "enabled" so you can tell whether it would
+play on a real commit or push.
 
 By default the player starts in the background, as it does from a git hook.
 Use --wait to block until playback ends and see player errors.`,
@@ -31,7 +32,7 @@ Use --wait to block until playback ends and see player errors.`,
 			if err != nil {
 				return err
 			}
-			res, err := event.Play(p, args[0], event.Options{IgnoreEnabled: true, Wait: wait})
+			res, err := event.Play(p, args[0], event.Options{IgnoreEnabled: true, IgnoreCooldown: true, Wait: wait})
 			if err != nil {
 				var e *event.Error
 				if errors.As(err, &e) {

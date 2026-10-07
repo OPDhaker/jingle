@@ -98,6 +98,22 @@ if [ -n "$target" ]; then
 	"$target" "$@"
 	status=$?
 fi
+# Rebase, cherry-pick, and revert fire post-commit once per replayed commit:
+# stay quiet while one is in progress. Checked here, not in jingle, because
+# git removes the state as soon as the last commit is replayed.
+gd=${GIT_DIR:-}
+if [ -z "$gd" ]; then
+	if [ -d .git ]; then
+		gd=.git
+	else
+		gd=$(git rev-parse --git-dir 2>/dev/null) || gd=
+	fi
+fi
+if [ -n "$gd" ]; then
+	for f in rebase-merge rebase-apply CHERRY_PICK_HEAD REVERT_HEAD sequencer; do
+		[ -e "$gd/$f" ] && exit "$status"
+	done
+fi
 play commit
 exit "$status"
 {{- else}}
@@ -140,7 +156,7 @@ var events = map[string]string{
 
 // does describes, for the shim header, what a hook adds beyond chaining.
 var does = map[string]string{
-	"post-commit":           "plays the commit sound in the background",
+	"post-commit":           "plays the commit sound in the background, except mid-rebase, cherry-pick, or revert",
 	"pre-push":              "marks the push for reference-transaction",
 	"reference-transaction": "plays the push sound once a marked push succeeds",
 }

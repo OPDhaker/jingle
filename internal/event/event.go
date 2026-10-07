@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"time"
 
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/player"
@@ -22,6 +23,9 @@ const (
 	CodeSoundMissing  = "sound_missing"
 	CodeNoPlayer      = "no_player"
 	CodePlayerFailed  = "player_failed"
+	// CodeCooldown: the event played too recently. Hooks only; `jingle play`
+	// ignores the cooldown, so this never reaches the CLI.
+	CodeCooldown = "cooldown"
 )
 
 // Error is a Play failure with a stable code.
@@ -40,6 +44,8 @@ func errorf(code, format string, args ...any) *Error {
 type Options struct {
 	// IgnoreEnabled plays even if jingle or the event is switched off (`jingle play`).
 	IgnoreEnabled bool
+	// IgnoreCooldown plays even if the event played moments ago (`jingle play`).
+	IgnoreCooldown bool
 	// Wait blocks until the player exits instead of starting it detached.
 	Wait bool
 }
@@ -85,6 +91,11 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 		return res, errorf(CodeNoPlayer, "no audio player found on this machine")
 	}
 	res.Player = p
+	// Last check, so only a sound that would really play starts the cooldown.
+	cooldown := time.Duration(cfg.Cooldown) * time.Second
+	if !opts.IgnoreCooldown && !takeTurn(paths, event, cooldown, time.Now) {
+		return res, errorf(CodeCooldown, "%s played less than %ds ago", event, cfg.Cooldown)
+	}
 	if opts.Wait {
 		res.Waited = true
 		err = player.Run(p, res.Sound)

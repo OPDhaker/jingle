@@ -14,6 +14,8 @@ import (
 
 const configKeysHelp = `Keys:
   enabled          true|false  master switch
+  cooldown         <seconds>   quiet time after a sound, per event, so a
+                               burst of commits plays once (default 3, 0 off)
   commit.enabled   true|false  play on git commit
   commit.sound     <file>      sound for commits ("" to clear)
   push.enabled     true|false  play on git push
@@ -38,7 +40,8 @@ func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
   jingle config get commit.sound
   jingle config set commit.sound ~/Music/tag.mp3
   jingle config set push.enabled false
-  jingle config set push.when attempt`,
+  jingle config set push.when attempt
+  jingle config set cooldown 0`,
 		Args: cobra.NoArgs,
 	}
 	cmd.AddCommand(newConfigListCmd(printer), newConfigGetCmd(printer), newConfigSetCmd(printer))

@@ -43,15 +43,18 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Result:** all of the above is in place, and `integration/` covers the exit criteria, plus chaining to a previous global `core.hooksPath`, linked worktrees, and `pre-push` stdin/args passthrough. Push plays on attempt: from `pre-push`, only if there is something to send and the user's `pre-push` passes. All 21 hooks git runs from the hooks dir get pass-through shims, adding about 35 ms per commit on macOS. Verified locally on macOS only; Linux relies on the CI job.
 
-## Phase 2: Correctness & polish
+## Phase 2: Correctness & polish (in progress)
 
-- Push sound only on a successful push (`pre-push` marker + `reference-transaction`, validated in Phase 0). Optional "play on attempt" fallback for pushes to a raw URL.
-- Suppress sounds during rebase and cherry-pick (detect `rebase-merge/` and `CHERRY_PICK_HEAD`); cooldown so a burst of commits plays once. Merges don't fire `post-commit`; optionally add a `post-merge` event.
+- ✅ Push sound only on a successful push (`pre-push` marker + `reference-transaction`, validated in Phase 0). "Play on attempt" fallback for pushes to a raw URL.
+- ✅ Suppress sounds during rebase and cherry-pick (detect `rebase-merge/` and `CHERRY_PICK_HEAD`); cooldown so a burst of commits plays once.
+- Merges don't fire `post-commit`; optionally add a `post-merge` event.
 - `doctor`: detects repo-local `core.hooksPath` (husky etc.), missing player, old git, broken audio path; each problem gets a fix hint.
 - Opt-in husky integration.
 - Multiple sounds per event, picked at random. Volume setting.
 
 **Exit:** `doctor --json` covers every known failure mode; no sound plays on a failed push or during a rebase.
+
+**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Decided for the next pass: `doctor` exits 1 on error-severity problems (report still on stdout); husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
 
 ## Phase 3: Windows + distribution
 

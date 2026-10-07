@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -41,19 +42,26 @@ const (
 // Config is the user's preferences (config.toml). The TOML keys are exactly
 // the keys accepted by `jingle config get/set`.
 type Config struct {
-	Version int   `toml:"version"`
-	Enabled bool  `toml:"enabled"`
-	Commit  Event `toml:"commit"`
-	Push    Event `toml:"push"`
+	Version int  `toml:"version"`
+	Enabled bool `toml:"enabled"`
+	// Cooldown is the minimum number of seconds between two sounds for the
+	// same event from git hooks, so a burst of commits plays once. 0 = off.
+	Cooldown int   `toml:"cooldown"`
+	Commit   Event `toml:"commit"`
+	Push     Event `toml:"push"`
 }
+
+// MaxCooldown caps the cooldown setting (seconds).
+const MaxCooldown = 3600
 
 // Default returns the config used when no file exists.
 func Default() Config {
 	return Config{
-		Version: Version,
-		Enabled: true,
-		Commit:  Event{Enabled: true},
-		Push:    Event{Enabled: true, When: PushSuccess},
+		Version:  Version,
+		Enabled:  true,
+		Cooldown: 3,
+		Commit:   Event{Enabled: true},
+		Push:     Event{Enabled: true, When: PushSuccess},
 	}
 }
 
@@ -99,6 +107,9 @@ func Load(p Paths) (Config, error) {
 	if err := validWhen(cfg.Push.When); err != nil {
 		return cfg, fmt.Errorf("%s: push.when: %w", p.ConfigFile(), err)
 	}
+	if err := validCooldown(cfg.Cooldown); err != nil {
+		return cfg, fmt.Errorf("%s: cooldown: %w", p.ConfigFile(), err)
+	}
 	return cfg, nil
 }
 
@@ -113,15 +124,18 @@ func Save(p Paths, cfg Config) error {
 }
 
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "commit.enabled", "commit.sound", "push.enabled", "push.sound", "push.when"}
+var Keys = []string{"enabled", "cooldown", "commit.enabled", "commit.sound", "push.enabled", "push.sound", "push.when"}
 
 // ErrUnknownKey is returned by Get and Set for keys not in Keys.
 var ErrUnknownKey = errors.New("unknown config key")
 
-// Get returns the value of key (a bool or a string).
+// Get returns the value of key (a bool, int, or string).
 func (c *Config) Get(key string) (any, error) {
-	if key == "enabled" {
+	switch key {
+	case "enabled":
 		return c.Enabled, nil
+	case "cooldown":
+		return c.Cooldown, nil
 	}
 	ev, field, ok := c.split(key)
 	if !ok {
@@ -140,13 +154,25 @@ func (c *Config) Get(key string) (any, error) {
 // Sound values are stored as given; the caller is responsible for copying the
 // file into the sounds dir first.
 func (c *Config) Set(key, raw string) (changed bool, err error) {
-	if key == "enabled" {
+	switch key {
+	case "enabled":
 		b, err := ParseBool(raw)
 		if err != nil {
 			return false, err
 		}
 		changed = c.Enabled != b
 		c.Enabled = b
+		return changed, nil
+	case "cooldown":
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			return false, fmt.Errorf("invalid number %q (use whole seconds, 0 to %d)", raw, MaxCooldown)
+		}
+		if err := validCooldown(n); err != nil {
+			return false, err
+		}
+		changed = c.Cooldown != n
+		c.Cooldown = n
 		return changed, nil
 	}
 	ev, field, ok := c.split(key)
@@ -191,6 +217,13 @@ func (c *Config) split(key string) (*Event, string, bool) {
 
 func unknownKey(key string) error {
 	return fmt.Errorf("%w %q (valid keys: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
+}
+
+func validCooldown(n int) error {
+	if n < 0 || n > MaxCooldown {
+		return fmt.Errorf("invalid cooldown %d (use 0 to %d seconds)", n, MaxCooldown)
+	}
+	return nil
 }
 
 func validWhen(v string) error {

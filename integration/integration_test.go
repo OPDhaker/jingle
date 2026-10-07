@@ -143,9 +143,11 @@ func (s *sandbox) mustJingle(args ...string) map[string]any {
 }
 
 // installWithSounds installs and points both events at generated WAV files.
+// The cooldown is off so tests can count every sound.
 func (s *sandbox) installWithSounds() {
 	s.t.Helper()
 	s.mustJingle("install", "--yes")
+	s.mustJingle("config", "set", "cooldown", "0")
 	for _, ev := range []string{"commit", "push"} {
 		wav := filepath.Join(s.root, "tag.wav")
 		writeWAV(s.t, wav)
@@ -383,6 +385,78 @@ func TestUserReferenceTransactionHookStillRuns(t *testing.T) {
 	if got := readFile(t, log); !strings.Contains(got, "refs/remotes/origin/main\n") {
 		t.Fatalf("during push the user hook logged %q", got)
 	}
+}
+
+// change commits an edit to a file with hooks off.
+func (s *sandbox) change(repo, file, msg string) {
+	s.t.Helper()
+	p := filepath.Join(repo, file)
+	old, _ := os.ReadFile(p)
+	writeFile(s.t, p, string(old)+msg+"\n")
+	s.mustGit(repo, "add", file)
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", msg)
+}
+
+func TestReplayedCommitsAreQuiet(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	repo := s.repo("repo")
+	for _, m := range []string{"a", "b", "c", "d"} {
+		s.change(repo, m+".txt", m)
+	}
+
+	s.mustGit(repo, "rebase", "-q", "--force-rebase", "HEAD~3")
+	s.wantPlayed()
+
+	s.mustGit(repo, "revert", "--no-edit", "HEAD~2..HEAD")
+	s.wantPlayed()
+
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "checkout", "-q", "-b", "side")
+	s.change(repo, "side.txt", "side")
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "checkout", "-q", "main")
+	s.mustGit(repo, "cherry-pick", "side")
+	s.wantPlayed()
+
+	// A rebase in a linked worktree keeps its state in the worktree's git dir.
+	wt := filepath.Join(s.root, "wt")
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "worktree", "add", "-q", "-b", "wt", wt)
+	s.change(wt, "w1.txt", "w1")
+	s.change(wt, "w2.txt", "w2")
+	s.mustGit(wt, "rebase", "-q", "--force-rebase", "HEAD~2")
+	s.wantPlayed()
+
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "plain")
+	s.wantPlayed("commit")
+}
+
+func TestPullRebaseIsQuiet(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	remote, repo := s.pushSetup()
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "push", "-q", "origin", "main")
+	other := filepath.Join(s.root, "other")
+	s.mustGit(s.root, "-c", "core.hooksPath=/dev/null", "clone", "-q", remote, other)
+	s.change(other, "theirs.txt", "theirs")
+	s.mustGit(other, "-c", "core.hooksPath=/dev/null", "push", "-q", "origin", "main")
+
+	s.change(repo, "ours.txt", "ours")
+	s.mustGit(repo, "pull", "-q", "--rebase", "origin", "main")
+	s.wantPlayed()
+}
+
+func TestCooldownPlaysBurstOnce(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	s.mustJingle("config", "set", "cooldown", "60")
+	repo := s.repo("repo")
+	for _, m := range []string{"one", "two", "three"} {
+		s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", m)
+	}
+	s.wantPlayed("commit")
+
+	// play is for testing setup: it ignores the cooldown.
+	s.mustJingle("play", "commit")
+	s.wantPlayed("commit", "commit")
 }
 
 func TestChainsToPreviousGlobalHooksPath(t *testing.T) {

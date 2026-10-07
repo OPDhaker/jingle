@@ -107,6 +107,28 @@ func TestPushWhen(t *testing.T) {
 	}
 }
 
+func TestCooldown(t *testing.T) {
+	cfg := Default()
+	if v, _ := cfg.Get("cooldown"); v != 3 {
+		t.Fatalf("default cooldown = %v", v)
+	}
+	if changed, err := cfg.Set("cooldown", "0"); err != nil || !changed || cfg.Cooldown != 0 {
+		t.Fatalf("changed=%v err=%v cooldown=%d", changed, err, cfg.Cooldown)
+	}
+	for _, bad := range []string{"-1", "1.5", "3s", "", "3601"} {
+		if _, err := cfg.Set("cooldown", bad); err == nil {
+			t.Errorf("accepted cooldown %q", bad)
+		}
+	}
+	p := testPaths(t)
+	if err := os.WriteFile(p.ConfigFile(), []byte("version = 1\ncooldown = -5\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("loaded a negative cooldown")
+	}
+}
+
 func TestSoundPathRelative(t *testing.T) {
 	p := testPaths(t)
 	cfg := Default()
