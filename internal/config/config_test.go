@@ -43,6 +43,8 @@ func TestLoadRejectsUnknownKeysAndVersions(t *testing.T) {
 		"unknown key": "version = 1\nenabeld = false\n",
 		"bad version": "version = 2\n",
 		"bad toml":    "enabled = \n",
+		"commit.when": "version = 1\n[commit]\nwhen = \"attempt\"\n",
+		"bad when":    "version = 1\n[push]\nwhen = \"sometimes\"\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := testPaths(t)
@@ -70,13 +72,38 @@ func TestGetSet(t *testing.T) {
 	if _, err := cfg.Set("enabled", "yes please"); err == nil {
 		t.Fatal("accepted a bad boolean")
 	}
-	for _, k := range []string{"nope", "commit", "commit.volume", "merge.enabled"} {
+	for _, k := range []string{"nope", "commit", "commit.volume", "commit.when", "merge.enabled"} {
 		if _, err := cfg.Get(k); !errors.Is(err, ErrUnknownKey) {
 			t.Errorf("Get(%q): %v", k, err)
 		}
 	}
 	if got := len(cfg.Flatten()); got != len(Keys) {
 		t.Fatalf("Flatten has %d keys", got)
+	}
+}
+
+func TestPushWhen(t *testing.T) {
+	cfg := Default()
+	if v, _ := cfg.Get("push.when"); v != PushSuccess {
+		t.Fatalf("default push.when = %v", v)
+	}
+	if changed, err := cfg.Set("push.when", "Attempt"); err != nil || !changed || cfg.Push.When != PushAttempt {
+		t.Fatalf("changed=%v err=%v when=%q", changed, err, cfg.Push.When)
+	}
+	if _, err := cfg.Set("push.when", "sometimes"); err == nil {
+		t.Fatal("accepted a bad push.when")
+	}
+	if _, err := cfg.Set("commit.when", "attempt"); !errors.Is(err, ErrUnknownKey) {
+		t.Fatalf("commit.when: %v", err)
+	}
+
+	// A config written before push.when existed loads with the default.
+	p := testPaths(t)
+	if err := os.WriteFile(p.ConfigFile(), []byte("version = 1\n[push]\nenabled = false\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Load(p); err != nil || got.Push.When != PushSuccess {
+		t.Fatalf("got %+v, %v", got.Push, err)
 	}
 }
 

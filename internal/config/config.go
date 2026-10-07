@@ -28,7 +28,15 @@ func IsEvent(name string) bool { return slices.Contains(Events, name) }
 type Event struct {
 	Enabled bool   `toml:"enabled"`
 	Sound   string `toml:"sound"` // absolute, or relative to the sounds dir; "" = none
+	// When is push only: PushSuccess or PushAttempt.
+	When string `toml:"when,omitempty"`
 }
+
+// Values of push.when.
+const (
+	PushSuccess = "success" // play once the push went through (needs git 2.28+)
+	PushAttempt = "attempt" // play when pre-push passes, before anything is sent
+)
 
 // Config is the user's preferences (config.toml). The TOML keys are exactly
 // the keys accepted by `jingle config get/set`.
@@ -45,7 +53,7 @@ func Default() Config {
 		Version: Version,
 		Enabled: true,
 		Commit:  Event{Enabled: true},
-		Push:    Event{Enabled: true},
+		Push:    Event{Enabled: true, When: PushSuccess},
 	}
 }
 
@@ -85,6 +93,12 @@ func Load(p Paths) (Config, error) {
 	if cfg.Version != Version {
 		return cfg, fmt.Errorf("%s: unsupported config version %d (this jingle supports %d)", p.ConfigFile(), cfg.Version, Version)
 	}
+	if cfg.Commit.When != "" {
+		return cfg, fmt.Errorf("%s: unknown keys: commit.when", p.ConfigFile())
+	}
+	if err := validWhen(cfg.Push.When); err != nil {
+		return cfg, fmt.Errorf("%s: push.when: %w", p.ConfigFile(), err)
+	}
 	return cfg, nil
 }
 
@@ -99,7 +113,7 @@ func Save(p Paths, cfg Config) error {
 }
 
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "commit.enabled", "commit.sound", "push.enabled", "push.sound"}
+var Keys = []string{"enabled", "commit.enabled", "commit.sound", "push.enabled", "push.sound", "push.when"}
 
 // ErrUnknownKey is returned by Get and Set for keys not in Keys.
 var ErrUnknownKey = errors.New("unknown config key")
@@ -111,10 +125,13 @@ func (c *Config) Get(key string) (any, error) {
 	}
 	ev, field, ok := c.split(key)
 	if !ok {
-		return nil, fmt.Errorf("%w %q (valid keys: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
+		return nil, unknownKey(key)
 	}
-	if field == "enabled" {
+	switch field {
+	case "enabled":
 		return ev.Enabled, nil
+	case "when":
+		return ev.When, nil
 	}
 	return ev.Sound, nil
 }
@@ -134,15 +151,24 @@ func (c *Config) Set(key, raw string) (changed bool, err error) {
 	}
 	ev, field, ok := c.split(key)
 	if !ok {
-		return false, fmt.Errorf("%w %q (valid keys: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
+		return false, unknownKey(key)
 	}
-	if field == "enabled" {
+	switch field {
+	case "enabled":
 		b, err := ParseBool(raw)
 		if err != nil {
 			return false, err
 		}
 		changed = ev.Enabled != b
 		ev.Enabled = b
+		return changed, nil
+	case "when":
+		v := strings.ToLower(raw)
+		if err := validWhen(v); err != nil {
+			return false, err
+		}
+		changed = ev.When != v
+		ev.When = v
 		return changed, nil
 	}
 	changed = ev.Sound != raw
@@ -152,12 +178,26 @@ func (c *Config) Set(key, raw string) (changed bool, err error) {
 
 // split resolves "<event>.<field>" to the event settings and field name.
 func (c *Config) split(key string) (*Event, string, bool) {
+	if !slices.Contains(Keys, key) {
+		return nil, "", false
+	}
 	name, field, ok := strings.Cut(key, ".")
-	if !ok || (field != "enabled" && field != "sound") {
+	if !ok {
 		return nil, "", false
 	}
 	ev := c.Event(name)
 	return ev, field, ev != nil
+}
+
+func unknownKey(key string) error {
+	return fmt.Errorf("%w %q (valid keys: %s)", ErrUnknownKey, key, strings.Join(Keys, ", "))
+}
+
+func validWhen(v string) error {
+	if v != PushSuccess && v != PushAttempt {
+		return fmt.Errorf("invalid value %q (use %s or %s)", v, PushSuccess, PushAttempt)
+	}
+	return nil
 }
 
 // Flatten returns every key and its value.

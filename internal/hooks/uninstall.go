@@ -12,7 +12,7 @@ import (
 
 // Uninstall undoes Install: it restores the previous global core.hooksPath
 // (or unsets it, removing a [core] section or gitconfig file that install
-// created), removes the shims, and deletes state.json. Config and sounds are
+// created), removes the shims, the run dir, and state.json. Config and sounds are
 // kept. It is idempotent: with nothing to undo it reports "unchanged".
 func Uninstall(env Env, dryRun bool) (Result, error) {
 	hooksDir := env.Paths.HooksDir()
@@ -61,6 +61,9 @@ func Uninstall(env Env, dryRun bool) (Result, error) {
 	if len(shims) > 0 {
 		res.Changes = append(res.Changes, Change{Action: "remove_dir", Target: hooksDir, Note: "only if empty"})
 	}
+	if fileExists(env.Paths.RunDir()) {
+		res.Changes = append(res.Changes, Change{Action: "remove_dir", Target: env.Paths.RunDir()})
+	}
 	if fileExists(env.Paths.StateFile()) {
 		res.Changes = append(res.Changes, Change{Action: "remove_state", Target: env.Paths.StateFile()})
 	}
@@ -97,6 +100,9 @@ func Uninstall(env Env, dryRun bool) (Result, error) {
 		}
 	}
 	_ = os.Remove(hooksDir) // fails, harmlessly, if the user keeps other files there
+	if err := os.RemoveAll(env.Paths.RunDir()); err != nil {
+		return res, err
+	}
 	if err := config.RemoveState(env.Paths); err != nil {
 		return res, err
 	}

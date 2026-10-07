@@ -19,13 +19,17 @@ const appName = "jingle"
 // Paths are the directories jingle reads and writes.
 type Paths struct {
 	ConfigDir string // config.toml
-	DataDir   string // hooks/, sounds/, state.json
+	DataDir   string // hooks/, sounds/, run/, state.json
 }
 
 func (p Paths) ConfigFile() string { return filepath.Join(p.ConfigDir, "config.toml") }
 func (p Paths) StateFile() string  { return filepath.Join(p.DataDir, "state.json") }
 func (p Paths) HooksDir() string   { return filepath.Join(p.DataDir, "hooks") }
 func (p Paths) SoundsDir() string  { return filepath.Join(p.DataDir, "sounds") }
+
+// RunDir holds short-lived files the hooks coordinate through (push markers,
+// cooldown stamps). Deleting it at any time is safe.
+func (p Paths) RunDir() string { return filepath.Join(p.DataDir, "run") }
 
 // ResolvePaths returns the paths for the current user and OS.
 func ResolvePaths() (Paths, error) {

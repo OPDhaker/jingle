@@ -18,9 +18,16 @@ const configKeysHelp = `Keys:
   commit.sound     <file>      sound for commits ("" to clear)
   push.enabled     true|false  play on git push
   push.sound       <file>      sound for pushes ("" to clear)
+  push.when        success|attempt
+                               success (default): play once the push went
+                               through; attempt: play when pre-push passes
 
 Booleans also accept on/off. Sound files (` + "mp3 wav aiff aif m4a ogg flac" + `) are
-copied into jingle's data dir, so moving the original later is fine.`
+copied into jingle's data dir, so moving the original later is fine.
+
+push.when success needs git 2.28+. With older git, and for pushes to a URL
+rather than a named remote (no remote-tracking ref moves), push plays on
+attempt.`
 
 func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -30,7 +37,8 @@ func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 		Example: `  jingle config list --json
   jingle config get commit.sound
   jingle config set commit.sound ~/Music/tag.mp3
-  jingle config set push.enabled false`,
+  jingle config set push.enabled false
+  jingle config set push.when attempt`,
 		Args: cobra.NoArgs,
 	}
 	cmd.AddCommand(newConfigListCmd(printer), newConfigGetCmd(printer), newConfigSetCmd(printer))

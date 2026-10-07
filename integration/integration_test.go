@@ -300,6 +300,91 @@ func TestPushPassesStdinAndExitStatus(t *testing.T) {
 	s.wantPlayed("push")
 }
 
+// pushSetup returns a clone of a bare remote with one unpushed commit.
+func (s *sandbox) pushSetup() (remote, repo string) {
+	s.t.Helper()
+	remote = filepath.Join(s.root, "remote.git")
+	s.mustGit(s.root, "init", "-q", "--bare", "-b", "main", remote)
+	repo = filepath.Join(s.root, "clone")
+	s.mustGit(s.root, "clone", "-q", remote, repo)
+	s.commitQuietly(repo, "one")
+	return remote, repo
+}
+
+// commitQuietly commits with hooks off, so setup commits play nothing.
+func (s *sandbox) commitQuietly(repo, msg string) {
+	s.t.Helper()
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", msg)
+}
+
+func TestPushPlaysOnlyOnSuccess(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	remote, repo := s.pushSetup()
+
+	// The remote rejects the push after pre-push passed: no sound.
+	reject := filepath.Join(remote, "hooks", "pre-receive")
+	writeExec(t, reject, "#!/bin/sh\necho rejected >&2\nexit 1\n")
+	if out, code := s.git(repo, "push", "-q", "origin", "main"); code == 0 {
+		t.Fatalf("push succeeded despite rejecting pre-receive\n%s", out)
+	}
+	s.wantPlayed()
+
+	// A dry run sends nothing: no sound, and the marker it leaves behind
+	// must not make a later fetch play.
+	remove(t, reject)
+	s.mustGit(repo, "push", "-q", "--dry-run", "origin", "main")
+	s.mustGit(repo, "fetch", "-q", "origin")
+	s.wantPlayed()
+
+	s.mustGit(repo, "push", "-q", "origin", "main")
+	s.wantPlayed("push")
+
+	// A raw path updates no remote-tracking ref, so it plays on attempt.
+	s.commitQuietly(repo, "two")
+	s.mustGit(repo, "push", "-q", remote, "main")
+	s.wantPlayed("push", "push")
+
+	// The dry run's marker is still there; uninstall clears the run dir.
+	s.mustJingle("uninstall", "--yes")
+	if _, err := os.Stat(filepath.Join(s.jingleDir, "run")); err == nil {
+		t.Fatal("run dir left behind after uninstall")
+	}
+}
+
+func TestPushWhenAttemptPlaysOnRejectedPush(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	s.mustJingle("config", "set", "push.when", "attempt")
+	remote, repo := s.pushSetup()
+	writeExec(t, filepath.Join(remote, "hooks", "pre-receive"), "#!/bin/sh\nexit 1\n")
+	if _, code := s.git(repo, "push", "-q", "origin", "main"); code == 0 {
+		t.Fatal("push succeeded despite rejecting pre-receive")
+	}
+	s.wantPlayed("push")
+}
+
+func TestUserReferenceTransactionHookStillRuns(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	_, repo := s.pushSetup()
+	log := filepath.Join(s.root, "rt.log")
+	writeExec(t, filepath.Join(repo, ".git", "hooks", "reference-transaction"), fmt.Sprintf(
+		"#!/bin/sh\n[ \"$1\" = committed ] || exit 0\nwhile read -r old new ref; do echo \"$ref\" >> '%s'; done\n", log))
+
+	s.commitQuietly(repo, "two") // hooks off: must not log
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "three")
+	if got := readFile(t, log); !strings.Contains(got, "refs/heads/main\n") {
+		t.Fatalf("after commit the user hook logged %q", got)
+	}
+	remove(t, log)
+	s.mustGit(repo, "push", "-q", "origin", "main")
+	s.wantPlayed("commit", "push")
+	if got := readFile(t, log); !strings.Contains(got, "refs/remotes/origin/main\n") {
+		t.Fatalf("during push the user hook logged %q", got)
+	}
+}
+
 func TestChainsToPreviousGlobalHooksPath(t *testing.T) {
 	s := newSandbox(t)
 	prev := filepath.Join(s.root, "prev-hooks")

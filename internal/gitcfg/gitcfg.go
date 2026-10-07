@@ -90,6 +90,20 @@ func (g Git) must(args ...string) (string, error) {
 	return out, nil
 }
 
+// MinPushDetect is the first git version with the reference-transaction
+// hook, which jingle needs to tell a successful push from an attempt.
+var MinPushDetect = [3]int{2, 28, 0}
+
+// VersionLess reports whether version a is older than b.
+func VersionLess(a, b [3]int) bool {
+	for i := range 3 {
+		if a[i] != b[i] {
+			return a[i] < b[i]
+		}
+	}
+	return false
+}
+
 var versionRE = regexp.MustCompile(`(\d+)\.(\d+)(?:\.(\d+))?`)
 
 // Version returns git's version string and its [major, minor, patch].

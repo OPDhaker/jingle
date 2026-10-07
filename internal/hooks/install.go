@@ -114,7 +114,7 @@ func Install(env Env, dryRun bool) (Result, error) {
 	if writeState {
 		res.Changes = append(res.Changes, Change{Action: "write_state", Target: env.Paths.StateFile()})
 	}
-	shims := Shims(ShimConfig{Jingle: env.JinglePath, Chain: want.ChainDir, Self: hooksDir})
+	shims := Shims(ShimConfig{Jingle: env.JinglePath, Chain: want.ChainDir, Self: hooksDir, Run: env.Paths.RunDir()})
 	writes, stale, err := diffShims(hooksDir, shims)
 	if err != nil {
 		return res, err

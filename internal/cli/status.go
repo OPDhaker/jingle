@@ -9,14 +9,11 @@ import (
 
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/event"
+	"github.com/OPDhaker/jingle/internal/gitcfg"
 	"github.com/OPDhaker/jingle/internal/hooks"
 	"github.com/OPDhaker/jingle/internal/output"
 	"github.com/OPDhaker/jingle/internal/player"
 )
-
-// minGitPushDetect is the git version with the reference-transaction hook,
-// which Phase 2's success-only push sound needs.
-var minGitPushDetect = [3]int{2, 28, 0}
 
 type problem struct {
 	Code    string `json:"code"`
@@ -76,8 +73,8 @@ func gatherStatus(env hooks.Env) statusInfo {
 		add("git_failed", fmt.Sprintf("cannot run git: %v", err), "")
 	} else {
 		st.Git = &gitInfo{Path: gitPath, Version: ver}
-		if versionLess(v, minGitPushDetect) {
-			add("git_too_old", fmt.Sprintf("git %s is older than 2.28; a future jingle needs 2.28+ to detect successful pushes", ver), "upgrade git")
+		if gitcfg.VersionLess(v, gitcfg.MinPushDetect) {
+			add("git_too_old", fmt.Sprintf("git %s is older than 2.28, so jingle cannot tell when a push succeeded; push plays on attempt instead", ver), "upgrade git")
 		}
 		if in, err := hooks.Inspect(env); err != nil {
 			add("git_failed", fmt.Sprintf("cannot read git config: %v", err), "")
@@ -153,15 +150,6 @@ func printStatus(w io.Writer, st statusInfo) {
 			fmt.Fprintf(w, "    fix: %s\n", p.Fix)
 		}
 	}
-}
-
-func versionLess(a, b [3]int) bool {
-	for i := range 3 {
-		if a[i] != b[i] {
-			return a[i] < b[i]
-		}
-	}
-	return false
 }
 
 func isFile(p string) bool {

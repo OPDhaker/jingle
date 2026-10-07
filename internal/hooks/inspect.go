@@ -43,7 +43,7 @@ func Inspect(env Env) (Inspection, error) {
 	in.StateInstalled = st.Installed
 	in.PreviousHooksPath, in.ChainDir, in.JinglePath = st.PreviousHooksPath, st.ChainDir, st.JinglePath
 	if st.Installed {
-		shims := Shims(ShimConfig{Jingle: st.JinglePath, Chain: st.ChainDir, Self: in.HooksDir})
+		shims := Shims(ShimConfig{Jingle: st.JinglePath, Chain: st.ChainDir, Self: in.HooksDir, Run: env.Paths.RunDir()})
 		writes, stale, err := diffShims(in.HooksDir, shims)
 		if err != nil {
 			return in, err

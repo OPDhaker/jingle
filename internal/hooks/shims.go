@@ -4,7 +4,9 @@
 // core.hooksPath, saving the previous value to state.json, and restoring it
 // exactly on uninstall. Shims always chain to the repo's own hooks (or to the
 // previous global hooks dir), passing stdin, args, and exit codes through.
-// See spikes/README.md for the push-detection design Phase 2 builds on.
+// The push sound plays only once a push succeeds: pre-push writes a marker
+// keyed by the git push process, and reference-transaction plays when that
+// same process updates a remote-tracking ref (design: spikes/README.md).
 package hooks
 
 import (
@@ -38,14 +40,21 @@ type ShimConfig struct {
 	Jingle string // jingle binary to call; falls back to `command -v jingle`
 	Chain  string // hooks dir to chain to; "" = the repo's own hooks dir
 	Self   string // jingle's hooks dir (never chained to)
+	Run    string // dir for push markers (see config.Paths.RunDir)
 }
 
 var shimTmpl = template.Must(template.New("shim").Funcs(template.FuncMap{"q": shQuote}).Parse(`#!/bin/sh
 ` + Marker + `: written by "jingle install", removed by "jingle uninstall". Do not edit.
 # Runs the {{.Hook}} hook git would have run without jingle, passing args,
-# stdin, and exit status through{{if .Event}}, then plays the {{.Event}} sound in the background{{end}}.
+# stdin, and exit status through.
+{{- with .Does}}
+# Also {{.}}.
+{{- end}}
 chain={{q .Chain}}
 self={{q .Self}}
+{{- if .Event}}
+run={{q .Run}}
+{{- end}}
 # Find the repo's hooks dir without forking git when possible: git runs hooks
 # from the worktree root (or from $GIT_DIR in a bare repo), and about a dozen
 # hooks fire per commit. Linked worktrees keep hooks in the common dir.
@@ -66,15 +75,33 @@ fi
 [ -n "$target" ] && exec "$target" "$@"
 exit 0
 {{- else}}
+{{- if eq .Hook "reference-transaction"}}
+
+# Fires 3 times per ref update in every git command: stay a plain
+# pass-through unless this is the committed phase of a push that pre-push
+# marked (the marker is keyed by the git push process, our parent).
+if [ "$1" != committed ] || [ ! -f "$run/push-$PPID" ]; then
+	[ -n "$target" ] && exec "$target" "$@"
+	exit 0
+fi
+{{- end}}
 
 play() {
 	j={{q .Jingle}}
 	[ -x "$j" ] || j=$(command -v jingle 2>/dev/null) || return 0
-	"$j" hook-event {{.Event}} >/dev/null 2>&1 </dev/null &
+	"$j" hook-event "$@" >/dev/null 2>&1 </dev/null &
 }
-{{- if eq .Hook "pre-push"}}
+{{- if eq .Hook "post-commit"}}
 
-# Empty stdin means nothing to send (up to date, or rejected): no sound.
+status=0
+if [ -n "$target" ]; then
+	"$target" "$@"
+	status=$?
+fi
+play commit
+exit "$status"
+{{- else}}
+
 input=$(cat)
 status=0
 if [ -n "$target" ]; then
@@ -85,25 +112,37 @@ if [ -n "$target" ]; then
 	fi
 	status=$?
 fi
-[ "$status" -eq 0 ] && [ -n "$input" ] && play
-exit "$status"
-{{- else}}
-
-status=0
-if [ -n "$target" ]; then
-	"$target" "$@"
-	status=$?
+{{- if eq .Hook "pre-push"}}
+# Empty stdin means nothing to send (up to date, or rejected): no sound.
+# Otherwise mark this push now, before git sends anything, so the
+# reference-transaction hook can tell it apart from a fetch.
+if [ "$status" -eq 0 ] && [ -n "$input" ]; then
+	mkdir -p "$run" 2>/dev/null && : >"$run/push-$PPID" 2>/dev/null
+	play pre-push "$PPID" "$1" "$2"
 fi
-play
+{{- else}}
+# A remote-tracking ref moved in the marked push process: the push went through.
+case $input in
+*" refs/remotes/"*) play push-done "$PPID" ;;
+esac
+{{- end}}
 exit "$status"
 {{- end}}
 {{- end}}
 `))
 
-// events maps hooks that play a sound to their event.
+// events maps the hooks that take part in playing a sound to their event.
 var events = map[string]string{
-	"post-commit": "commit",
-	"pre-push":    "push",
+	"post-commit":           "commit",
+	"pre-push":              "push",
+	"reference-transaction": "push",
+}
+
+// does describes, for the shim header, what a hook adds beyond chaining.
+var does = map[string]string{
+	"post-commit":           "plays the commit sound in the background",
+	"pre-push":              "marks the push for reference-transaction",
+	"reference-transaction": "plays the push sound once a marked push succeeds",
 }
 
 // RenderShim returns the shim script for hook.
@@ -111,8 +150,8 @@ func RenderShim(hook string, c ShimConfig) []byte {
 	var b bytes.Buffer
 	data := struct {
 		ShimConfig
-		Hook, Event string
-	}{c, hook, events[hook]}
+		Hook, Event, Does string
+	}{c, hook, events[hook], does[hook]}
 	if err := shimTmpl.Execute(&b, data); err != nil {
 		panic(err) // the template is static; any error is a bug
 	}
