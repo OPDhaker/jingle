@@ -21,6 +21,11 @@ func Execute() int {
 
 // Run runs the CLI with explicit arguments and streams (used by tests).
 func Run(args []string, stdout, stderr io.Writer) int {
+	// Hooks call this on every commit/push: skip cobra, never fail, never print.
+	if len(args) > 0 && args[0] == hookEventCmd {
+		runHookEvent(args[1:])
+		return output.ExitOK
+	}
 	var jsonMode bool
 	root := newRootCmd(&jsonMode)
 	root.SetArgs(args)
@@ -42,10 +47,24 @@ func newRootCmd(jsonMode *bool) *cobra.Command {
 		Long: `jingle plays a short audio clip (a producer tag) when you run git commit
 or git push. Install it once and it works in every repo on this machine.
 
-Every command supports --json for machine-readable output. Exit codes:
-  0  requested state reached
+Typical setup:
+  jingle install --yes
+  jingle config set commit.sound ~/Music/tag.mp3
+  jingle play commit
+  jingle status
+
+Every command supports --json for machine-readable output. Errors go to
+stderr; with --json as {"error": {"code": "...", "message": "..."}}.
+
+Exit codes:
+  0  requested state reached (including "unchanged")
   1  error
-  2  bad command, flag, or argument`,
+  2  bad command, flag, argument, or missing --yes
+
+Error codes: usage, confirmation_required, invalid_key, invalid_value,
+unknown_event, git_not_found, install_failed, uninstall_failed,
+config_invalid, sound_not_found, no_sound, sound_missing, no_player,
+player_failed, paths_unavailable, io_error`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -55,6 +74,14 @@ Every command supports --json for machine-readable output. Exit codes:
 	printer := func(cmd *cobra.Command) *output.Printer {
 		return output.New(*jsonMode, cmd.OutOrStdout(), cmd.ErrOrStderr())
 	}
-	root.AddCommand(newVersionCmd(printer))
+	root.AddCommand(
+		newInstallCmd(printer),
+		newUninstallCmd(printer),
+		newConfigCmd(printer),
+		newPlayCmd(printer),
+		newStatusCmd(printer),
+		newVersionCmd(printer),
+		newHookEventCmd(),
+	)
 	return root
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Phase 0 of `PRD.md` is done: decisions are recorded below, spikes are in `spikes/` (findings in `spikes/README.md`), and the Go skeleton builds. Only `jingle version` exists so far. **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
+Phase 1 of `PRD.md` (MVP, macOS + Linux) is done: `install`, `uninstall`, `config list|get|set`, `play`, `status`, and the hidden `hook-event`, with integration tests against real git (`integration/`). Phase 0 decisions are below; spikes are in `spikes/` (findings in `spikes/README.md`). **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
 
 ## Commands
 
@@ -12,6 +12,7 @@ Phase 0 of `PRD.md` is done: decisions are recorded below, spikes are in `spikes
 make build                                  # → bin/jingle (version injected via -ldflags)
 make test                                   # go test ./...
 go test ./internal/config -run TestResolvePaths   # single test
+go test ./integration/                      # builds bin, runs real git in a sandbox (skipped on Windows)
 make lint                                   # golangci-lint v2 (config: .golangci.yml)
 make fmt                                    # gofmt + goimports via golangci-lint
 ```
@@ -30,12 +31,14 @@ If golangci-lint isn't installed: `go run github.com/golangci/golangci-lint/v2/c
 | Config | TOML (`BurntSushi/toml`, add it in Phase 1), with a top-level `version = 1` |
 | Paths | Config: `$XDG_CONFIG_HOME/jingle/config.toml` (default `~/.config/jingle/`, macOS too); Windows `%AppData%\jingle\`. Data: `$XDG_DATA_HOME/jingle/` (default `~/.local/share/jingle/`); Windows `%LocalAppData%\jingle\`. Holds `hooks/`, `sounds/`, `state.json`. |
 | Config vs. state | User preferences go in `config.toml`. Tool-owned machine state (the saved previous `core.hooksPath`, install info) goes in `state.json`. Never mix them. |
-| Test isolation | `JINGLE_HOME` puts config and data in one dir. Integration tests must also set `HOME` and `GIT_CONFIG_GLOBAL` to temp paths, and must never touch the real `~/.gitconfig`. |
+| Test isolation | `JINGLE_HOME` puts config and data in one dir. `JINGLE_PLAYER` replaces the detected player (called as `<exe> <file>`). Integration tests must also set `HOME` and `GIT_CONFIG_GLOBAL` to temp paths, and must never touch the real `~/.gitconfig`. |
 | Playback | Shell out to the OS player. No audio library, no cgo. |
 
 ## Code layout and conventions
 
-- `cmd/jingle`: `main` only. `internal/cli`: cobra commands. `internal/output`: JSON/plain rendering, error envelope, exit codes. `internal/config`: paths, config, state. `internal/hooks`: install/uninstall and shims. `internal/player`: player detection and detached launch.
+- `cmd/jingle`: `main` only. `internal/cli`: cobra commands. `internal/output`: JSON/plain rendering, error envelope, exit codes. `internal/config`: paths, config, state, sound import. `internal/hooks`: install/uninstall/inspect and shim templates. `internal/gitcfg`: the `git config` / `git --version` calls. `internal/event`: decides whether and what to play (shared by `play` and `hook-event`). `internal/player`: player detection and detached launch. `internal/fsutil`: atomic writes. `integration/`: end-to-end tests with the built binary.
+- Shims pass through **every** hook git runs from the hooks dir (`hooks.HookNames`), not only the two that play, because setting `core.hooksPath` hides all repo hooks. If a previous global `core.hooksPath` existed, shims chain to it (not to the repo hooks, which git was already ignoring), so behavior is unchanged.
+- Uninstall restores the gitconfig byte for byte using facts recorded in `state.json` at install (file existed? `[core]` had keys? final newline?). Change that logic only together with `TestUninstallRestoresGitconfigByteForByte`.
 - Every cobra `RunE` returns `nil` or an `*output.Error` (stable `Code` + exit code). Any other error is assumed to come from cobra's argument parsing and is reported as `usage` / exit 2. Results are printed only through `output.Printer.Result`, which keeps `--json` output consistent.
 - Exit codes (`internal/output`): 0 ok, 1 error, 2 usage. Add new codes; never renumber existing ones.
 - Each command's cobra `Example:` field holds real invocations. Agents learn the tool from `--help`.
@@ -62,7 +65,7 @@ Prior art: [leomosley/tagthat](https://github.com/leomosley/tagthat) (Bun CLI) d
   - Known gap: pushing to a raw URL updates no tracking ref, so no sound.
   - `reference-transaction` fires 3× for every ref update in every git command, so the shim must bail out in plain `sh` before starting `jingle`.
 - **`post-commit` fires once per replayed commit during `rebase` / `pull --rebase`** (when `$GIT_DIR/rebase-merge/` exists) and during `cherry-pick` (when `$GIT_DIR/CHERRY_PICK_HEAD` exists). It never fires for `merge` (git runs `post-merge` instead). Suppression is planned for Phase 2. Detect these cases from the state files; `GIT_REFLOG_ACTION` is unreliable.
-- **Hooks must never block or break git.** Start playback detached and exit right away. The shim runs `jingle ... >/dev/null 2>&1 </dev/null &`; Go starts the player with `Setsid`, nil stdio, and `Process.Release()`. Measured overhead is about 10–30 ms per commit. A synchronous player adds about 2.4 s. A hook's own logic always exits 0. The only non-zero exit allowed is one passed through from a chained user hook. A missing config, missing audio file, or missing player means skip silently.
+- **Hooks must never block or break git.** Start playback detached and exit right away. The shim runs `jingle ... >/dev/null 2>&1 </dev/null &`; Go starts the player with `Setsid`, nil stdio, and `Process.Release()`. Measured with all 21 pass-through shims installed: about 35 ms extra per commit on macOS (about 12 hooks fire per commit; most of the cost is `sh` startup). Shims locate the repo's hooks dir without forking `git` when they can, because a `git rev-parse` per hook roughly tripled that. On macOS the first run of each newly written shim is slow, once (OS scan of new executables). A synchronous player adds about 2.4 s. A hook's own logic always exits 0. The only non-zero exit allowed is one passed through from a chained user hook. A missing config, missing audio file, or missing player means skip silently.
 - **Hook scripts must be POSIX `sh`.** They run under Git for Windows' bundled sh as well as macOS and Linux shells. Keep them minimal: chain the user's hook, then start `jingle` in the background to handle the event. If `jingle` is not on `PATH` (e.g. the user removed it without uninstalling), skip playback but still chain.
 - **Audio players by OS:** macOS `afplay` (verified). Linux: try `pw-play`, `paplay`, `aplay`, then `ffplay -nodisp -autoexit` (unverified). Windows: PowerShell `System.Windows.Media.MediaPlayer` for MP3, `System.Media.SoundPlayer` for WAV only (unverified until Phase 3).
 

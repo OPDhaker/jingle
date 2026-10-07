@@ -1,0 +1,458 @@
+// Package integration runs the jingle binary against real git in a sandbox:
+// temp HOME, GIT_CONFIG_GLOBAL, and JINGLE_HOME, and a fake audio player
+// (JINGLE_PLAYER) that logs what it was asked to play. The real ~/.gitconfig
+// is never touched.
+package integration
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"testing"
+	"time"
+)
+
+var jingleBin string
+
+func TestMain(m *testing.M) {
+	if runtime.GOOS == "windows" {
+		fmt.Println("integration tests need POSIX sh hooks; Windows support is Phase 3")
+		os.Exit(0)
+	}
+	dir, err := os.MkdirTemp("", "jingle-it-bin")
+	if err != nil {
+		panic(err)
+	}
+	jingleBin = filepath.Join(dir, "jingle")
+	build := exec.Command("go", "build", "-o", jingleBin, "github.com/OPDhaker/jingle/cmd/jingle")
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		panic("building jingle: " + err.Error())
+	}
+	code := m.Run()
+	_ = os.RemoveAll(dir)
+	os.Exit(code)
+}
+
+type sandbox struct {
+	t         *testing.T
+	root      string
+	env       []string
+	gitconfig string
+	jingleDir string
+	playLog   string
+}
+
+func newSandbox(t *testing.T) *sandbox {
+	t.Helper()
+	root, err := filepath.EvalSymlinks(t.TempDir()) // macOS: /var -> /private/var
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := &sandbox{
+		t:         t,
+		root:      root,
+		gitconfig: filepath.Join(root, "gitconfig"),
+		jingleDir: filepath.Join(root, "jingle"),
+		playLog:   filepath.Join(root, "played.log"),
+	}
+	home := filepath.Join(root, "home")
+	player := filepath.Join(root, "player")
+	mkdir(t, home)
+	writeExec(t, player, fmt.Sprintf("#!/bin/sh\nprintf '%%s\\n' \"$1\" >> '%s'\n", s.playLog))
+
+	for _, kv := range os.Environ() {
+		k, _, _ := strings.Cut(kv, "=")
+		if strings.HasPrefix(k, "GIT_") || strings.HasPrefix(k, "JINGLE_") || strings.HasPrefix(k, "XDG_") || k == "HOME" {
+			continue
+		}
+		s.env = append(s.env, kv)
+	}
+	s.env = append(s.env,
+		"HOME="+home,
+		"GIT_CONFIG_GLOBAL="+s.gitconfig,
+		"GIT_CONFIG_NOSYSTEM=1",
+		"JINGLE_HOME="+s.jingleDir,
+		"JINGLE_PLAYER="+player,
+		"GIT_AUTHOR_NAME=test", "GIT_AUTHOR_EMAIL=test@example.com",
+		"GIT_COMMITTER_NAME=test", "GIT_COMMITTER_EMAIL=test@example.com",
+	)
+	return s
+}
+
+// run runs a command in dir and returns combined output and exit code.
+func (s *sandbox) run(dir, name string, args ...string) (string, int) {
+	s.t.Helper()
+	cmd := exec.Command(name, args...)
+	cmd.Dir = dir
+	cmd.Env = s.env
+	out, err := cmd.CombinedOutput()
+	if ee := (*exec.ExitError)(nil); errors.As(err, &ee) {
+		return string(out), ee.ExitCode()
+	} else if err != nil {
+		s.t.Fatalf("%s %v: %v", name, args, err)
+	}
+	return string(out), 0
+}
+
+func (s *sandbox) git(dir string, args ...string) (string, int) {
+	s.t.Helper()
+	return s.run(dir, "git", args...)
+}
+
+func (s *sandbox) mustGit(dir string, args ...string) string {
+	s.t.Helper()
+	out, code := s.git(dir, args...)
+	if code != 0 {
+		s.t.Fatalf("git %v: exit %d\n%s", args, code, out)
+	}
+	return out
+}
+
+// jingle runs the binary with stdout only (stderr is checked via exit code).
+func (s *sandbox) jingle(args ...string) (string, int) {
+	s.t.Helper()
+	cmd := exec.Command(jingleBin, args...)
+	cmd.Dir = s.root
+	cmd.Env = s.env
+	out, err := cmd.Output()
+	if ee := (*exec.ExitError)(nil); errors.As(err, &ee) {
+		return string(out), ee.ExitCode()
+	} else if err != nil {
+		s.t.Fatal(err)
+	}
+	return string(out), 0
+}
+
+func (s *sandbox) mustJingle(args ...string) map[string]any {
+	s.t.Helper()
+	out, code := s.jingle(append(args, "--json")...)
+	if code != 0 {
+		s.t.Fatalf("jingle %v: exit %d\n%s", args, code, out)
+	}
+	var m map[string]any
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		s.t.Fatalf("jingle %v: stdout not JSON: %q", args, out)
+	}
+	return m
+}
+
+// installWithSounds installs and points both events at generated WAV files.
+func (s *sandbox) installWithSounds() {
+	s.t.Helper()
+	s.mustJingle("install", "--yes")
+	for _, ev := range []string{"commit", "push"} {
+		wav := filepath.Join(s.root, "tag.wav")
+		writeWAV(s.t, wav)
+		s.mustJingle("config", "set", ev+".sound", wav)
+	}
+}
+
+func (s *sandbox) repo(name string) string {
+	s.t.Helper()
+	dir := filepath.Join(s.root, name)
+	s.mustGit(s.root, "init", "-q", "-b", "main", dir)
+	return dir
+}
+
+// played returns the player log lines, waiting up to 3s for at least want.
+// With want == 0 it waits briefly so a stray background play would show up.
+func (s *sandbox) played(want int) []string {
+	s.t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	if want == 0 {
+		deadline = time.Now().Add(500 * time.Millisecond)
+	}
+	var lines []string
+	for {
+		data, _ := os.ReadFile(s.playLog)
+		lines = strings.Fields(string(data))
+		if (want > 0 && len(lines) >= want) || time.Now().After(deadline) {
+			return lines
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+}
+
+func (s *sandbox) wantPlayed(events ...string) {
+	s.t.Helper()
+	lines := s.played(len(events))
+	if len(lines) != len(events) {
+		s.t.Fatalf("played %d sounds %v, want %v", len(lines), lines, events)
+	}
+	for i, ev := range events {
+		if !strings.HasPrefix(filepath.Base(lines[i]), ev+"-") {
+			s.t.Fatalf("sound %d = %s, want the %s sound", i, lines[i], ev)
+		}
+	}
+}
+
+func TestInstallDryRunConfirmAndIdempotence(t *testing.T) {
+	s := newSandbox(t)
+
+	if res := s.mustJingle("install", "--dry-run"); res["status"] != "would_change" {
+		t.Fatalf("dry run status %v", res["status"])
+	}
+	if _, err := os.Stat(s.gitconfig); err == nil {
+		t.Fatal("dry run wrote the gitconfig")
+	}
+	if _, err := os.Stat(s.jingleDir); err == nil {
+		t.Fatal("dry run created the jingle dir")
+	}
+	if _, code := s.jingle("install"); code != 2 {
+		t.Fatalf("install without --yes: exit %d, want 2", code)
+	}
+
+	if res := s.mustJingle("install", "--yes"); res["status"] != "installed" {
+		t.Fatalf("status %v", res["status"])
+	}
+	if res := s.mustJingle("install", "--yes"); res["status"] != "unchanged" {
+		t.Fatalf("second install status %v", res["status"])
+	}
+	got := strings.TrimSpace(s.mustGit(s.root, "config", "--global", "core.hooksPath"))
+	if got != filepath.Join(s.jingleDir, "hooks") {
+		t.Fatalf("core.hooksPath = %q", got)
+	}
+	st := s.mustJingle("status")
+	if st["installed"] != true || st["shims_current"] != true {
+		t.Fatalf("status: %v", st)
+	}
+}
+
+func TestCommitPlaysAndRepoHooksStillRun(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	repo := s.repo("repo")
+	hooks := filepath.Join(repo, ".git", "hooks")
+	preMarker := filepath.Join(s.root, "pre-commit.ran")
+	postMarker := filepath.Join(s.root, "post-commit.ran")
+	failFlag := filepath.Join(s.root, "fail")
+	writeExec(t, filepath.Join(hooks, "pre-commit"), fmt.Sprintf(
+		"#!/bin/sh\ntouch '%s'\n[ -f '%s' ] && exit 1\nexit 0\n", preMarker, failFlag))
+	writeExec(t, filepath.Join(hooks, "post-commit"), fmt.Sprintf("#!/bin/sh\ntouch '%s'\n", postMarker))
+
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "one")
+	mustExist(t, preMarker)
+	mustExist(t, postMarker)
+	s.wantPlayed("commit")
+
+	// The repo's pre-commit fails: the commit must fail and nothing plays.
+	writeFile(t, failFlag, "")
+	if out, code := s.git(repo, "commit", "-q", "--allow-empty", "-m", "two"); code == 0 {
+		t.Fatalf("commit succeeded despite failing pre-commit hook\n%s", out)
+	}
+	s.wantPlayed("commit")
+
+	// Turned off: commits work, no sound.
+	remove(t, failFlag)
+	s.mustJingle("config", "set", "enabled", "false")
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "three")
+	s.wantPlayed("commit")
+
+	// play ignores the switch and reports it.
+	if res := s.mustJingle("play", "commit"); res["enabled"] != false {
+		t.Fatalf("play: %v", res)
+	}
+	s.wantPlayed("commit", "commit")
+}
+
+func TestPushPassesStdinAndExitStatus(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	remote := filepath.Join(s.root, "remote.git")
+	s.mustGit(s.root, "init", "-q", "--bare", "-b", "main", remote)
+	repo := filepath.Join(s.root, "clone")
+	s.mustGit(s.root, "clone", "-q", remote, repo)
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "commit", "-q", "--allow-empty", "-m", "one")
+
+	stdinCopy := filepath.Join(s.root, "pre-push.stdin")
+	argsCopy := filepath.Join(s.root, "pre-push.args")
+	failFlag := filepath.Join(s.root, "fail")
+	writeExec(t, filepath.Join(repo, ".git", "hooks", "pre-push"), fmt.Sprintf(
+		"#!/bin/sh\necho \"$@\" > '%s'\ncat > '%s'\n[ -f '%s' ] && exit 1\nexit 0\n", argsCopy, stdinCopy, failFlag))
+
+	head := strings.TrimSpace(s.mustGit(repo, "rev-parse", "HEAD"))
+	wantStdin := fmt.Sprintf("refs/heads/main %s refs/heads/main %s\n", head, strings.Repeat("0", len(head)))
+
+	writeFile(t, failFlag, "")
+	if out, code := s.git(repo, "push", "-q", "origin", "main"); code == 0 {
+		t.Fatalf("push succeeded despite failing pre-push hook\n%s", out)
+	}
+	s.wantPlayed()
+	if got := readFile(t, stdinCopy); got != wantStdin {
+		t.Fatalf("pre-push stdin = %q, want %q", got, wantStdin)
+	}
+	if got := readFile(t, argsCopy); got != "origin "+remote+"\n" {
+		t.Fatalf("pre-push args = %q", got)
+	}
+
+	remove(t, failFlag)
+	s.mustGit(repo, "push", "-q", "origin", "main")
+	s.wantPlayed("push")
+
+	// Everything up to date: nothing is sent, so no sound.
+	s.mustGit(repo, "push", "-q", "origin", "main")
+	s.wantPlayed("push")
+}
+
+func TestChainsToPreviousGlobalHooksPath(t *testing.T) {
+	s := newSandbox(t)
+	prev := filepath.Join(s.root, "prev-hooks")
+	prevMarker := filepath.Join(s.root, "prev.ran")
+	repoMarker := filepath.Join(s.root, "repo.ran")
+	writeExec(t, filepath.Join(prev, "pre-commit"), fmt.Sprintf("#!/bin/sh\ntouch '%s'\n", prevMarker))
+	original := fmt.Sprintf("[core]\n\thooksPath = %s\n", prev)
+	writeFile(t, s.gitconfig, original)
+
+	s.installWithSounds()
+	repo := s.repo("repo")
+	// git ignored repo hooks before install (global hooksPath was set); it still must.
+	writeExec(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), fmt.Sprintf("#!/bin/sh\ntouch '%s'\n", repoMarker))
+
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "one")
+	mustExist(t, prevMarker)
+	if _, err := os.Stat(repoMarker); err == nil {
+		t.Fatal("repo hook ran although the previous global hooksPath shadowed it")
+	}
+	s.wantPlayed("commit")
+
+	s.mustJingle("uninstall", "--yes")
+	if got := readFile(t, s.gitconfig); got != original {
+		t.Fatalf("gitconfig after uninstall:\n%q\nwant\n%q", got, original)
+	}
+}
+
+func TestLinkedWorktreeRunsRepoHook(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	repo := s.repo("repo")
+	marker := filepath.Join(s.root, "pre-commit.ran")
+	writeExec(t, filepath.Join(repo, ".git", "hooks", "pre-commit"), fmt.Sprintf("#!/bin/sh\ntouch '%s'\n", marker))
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "base")
+	remove(t, marker)
+	s.played(1)
+	remove(t, s.playLog)
+
+	wt := filepath.Join(s.root, "wt")
+	s.mustGit(repo, "worktree", "add", "-q", "-b", "side", wt)
+	s.mustGit(wt, "commit", "-q", "--allow-empty", "-m", "in worktree")
+	mustExist(t, marker)
+	s.wantPlayed("commit")
+}
+
+func TestUninstallRestoresGitconfigByteForByte(t *testing.T) {
+	cases := map[string]*string{
+		"absent":           nil,
+		"no core section":  ptr("[user]\n\tname = someone\n"),
+		"core other keys":  ptr("# my config\n[core]\n\teditor = vim\n[user]\n\tname = someone\n"),
+		"previous path":    ptr("[core]\n\thooksPath = ~/my-hooks\n"),
+		"no final newline": ptr("[alias]\n\tco = checkout"),
+	}
+	for name, original := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := newSandbox(t)
+			if original != nil {
+				writeFile(t, s.gitconfig, *original)
+			}
+			s.mustJingle("install", "--yes")
+			got := strings.TrimSpace(s.mustGit(s.root, "config", "--global", "core.hooksPath"))
+			if got != filepath.Join(s.jingleDir, "hooks") {
+				t.Fatalf("core.hooksPath after install = %q", got)
+			}
+
+			if res := s.mustJingle("uninstall", "--yes"); res["status"] != "uninstalled" {
+				t.Fatalf("status %v", res["status"])
+			}
+			data, err := os.ReadFile(s.gitconfig)
+			switch {
+			case original == nil && err == nil:
+				t.Fatalf("gitconfig should not exist, has %q", data)
+			case original != nil && string(data) != *original:
+				t.Fatalf("gitconfig after uninstall:\n%q\nwant\n%q", data, *original)
+			}
+			if res := s.mustJingle("uninstall", "--yes"); res["status"] != "unchanged" {
+				t.Fatalf("second uninstall status %v", res["status"])
+			}
+			if _, err := os.Stat(filepath.Join(s.jingleDir, "hooks")); err == nil {
+				t.Fatal("hooks dir left behind")
+			}
+		})
+	}
+}
+
+func ptr(s string) *string { return &s }
+
+func mkdir(t *testing.T, dir string) {
+	t.Helper()
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFile(t *testing.T, path, data string) {
+	t.Helper()
+	mkdir(t, filepath.Dir(path))
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeExec(t *testing.T, path, data string) {
+	t.Helper()
+	writeFile(t, path, data)
+	if err := os.Chmod(path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func remove(t *testing.T, path string) {
+	t.Helper()
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(data)
+}
+
+func mustExist(t *testing.T, path string) {
+	t.Helper()
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("%s: %v", filepath.Base(path), err)
+	}
+}
+
+// writeWAV writes a tiny valid 8 kHz mono 8-bit WAV (10 ms of silence).
+func writeWAV(t *testing.T, path string) {
+	t.Helper()
+	const n = 80
+	b := []byte("RIFF")
+	b = le32(b, 36+n)
+	b = append(b, "WAVEfmt "...)
+	b = le32(b, 16)
+	b = append(b, 1, 0, 1, 0) // PCM, mono
+	b = le32(b, 8000)
+	b = le32(b, 8000)
+	b = append(b, 1, 0, 8, 0) // block align, bits per sample
+	b = append(b, "data"...)
+	b = le32(b, n)
+	for range n {
+		b = append(b, 128)
+	}
+	writeFile(t, path, string(b))
+}
+
+func le32(b []byte, v uint32) []byte {
+	return append(b, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+}

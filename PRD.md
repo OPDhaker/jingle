@@ -29,7 +29,7 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Result:** Go + `jingle`, TOML in XDG/AppData dirs. Push detection via a marker keyed by the `git push` process plus `reference-transaction` works. Detached playback adds 10–30 ms on macOS. Linux/Windows playback still unverified (→ Phase 3). Details: `spikes/README.md`. The Go skeleton (`jingle version`, CI, lint) is also in place.
 
-## Phase 1: MVP (macOS + Linux)
+## Phase 1: MVP (macOS + Linux) ✅ done
 
 - `install` / `uninstall` (`--yes`, `--dry-run`): set global `core.hooksPath`, save and restore the previous value.
 - Hook shims for `post-commit` and `pre-push`, chaining to the repo's `.git/hooks/` and to any previous global hooks path.
@@ -40,6 +40,8 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 - `--json`, documented exit codes, plain output when not a TTY.
 
 **Exit:** integration tests (real git, temp `HOME`) prove: install → commit plays → user's repo hook still runs with the same exit code → uninstall restores config byte-for-byte. Install and uninstall are idempotent.
+
+**Result:** all of the above is in place, and `integration/` covers the exit criteria, plus chaining to a previous global `core.hooksPath`, linked worktrees, and `pre-push` stdin/args passthrough. Push plays on attempt: from `pre-push`, only if there is something to send and the user's `pre-push` passes. All 21 hooks git runs from the hooks dir get pass-through shims, adding about 35 ms per commit on macOS. Verified locally on macOS only; Linux relies on the CI job.
 
 ## Phase 2: Correctness & polish
 
