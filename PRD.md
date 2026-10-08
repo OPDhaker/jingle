@@ -41,7 +41,7 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Exit:** integration tests (real git, temp `HOME`) prove: install → commit plays → user's repo hook still runs with the same exit code → uninstall restores config byte-for-byte. Install and uninstall are idempotent.
 
-**Result:** all of the above is in place, and `integration/` covers the exit criteria, plus chaining to a previous global `core.hooksPath`, linked worktrees, and `pre-push` stdin/args passthrough. Push plays on attempt: from `pre-push`, only if there is something to send and the user's `pre-push` passes. All 21 hooks git runs from the hooks dir get pass-through shims, adding about 35 ms per commit on macOS. Verified locally on macOS only; Linux relies on the CI job.
+**Result:** all of the above is in place, and `integration/` covers the exit criteria, plus chaining to a previous global `core.hooksPath`, linked worktrees, and `pre-push` stdin/args passthrough. Push played on attempt: from `pre-push`, only if there was something to send and the user's `pre-push` passed (Phase 2 changed this to success only). All 21 hooks git runs from the hooks dir get pass-through shims, adding 35–60 ms per commit on macOS depending on the run. Verified locally on macOS only.
 
 ## Phase 2: Correctness & polish (in progress)
 
@@ -54,7 +54,7 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Exit:** `doctor --json` covers every known failure mode; no sound plays on a failed push or during a rebase.
 
-**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Decided for the next pass: `doctor` exits 1 on error-severity problems (report still on stdout); husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
+**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. Decided for the next pass: `doctor` exits 1 on error-severity problems (report still on stdout); husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
 
 ## Phase 3: Windows + distribution
 
