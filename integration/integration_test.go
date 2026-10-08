@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -484,6 +485,27 @@ func TestSeveralSoundsPlayAtRandom(t *testing.T) {
 	s.mustJingle("play", "commit", "--sound", "b.wav", "--wait")
 	if got := s.played(1); len(got) != 1 || filepath.Base(got[0]) != "commit-b.wav" {
 		t.Fatalf("play --sound b.wav played %v", got)
+	}
+}
+
+func TestVolume(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	if res := s.mustJingle("config", "set", "volume", "50"); res["value"] != 50.0 || res["changed"] != true {
+		t.Fatalf("set volume: %v", res)
+	}
+	if _, code := s.jingle("config", "set", "volume", "150"); code != 2 {
+		t.Fatalf("volume 150: exit %d, want 2", code)
+	}
+	// JINGLE_PLAYER is called as <exe> <file>: still plays, at full volume.
+	res := s.mustJingle("play", "commit", "--wait")
+	if res["volume"] != 50.0 || res["player"].(map[string]any)["volume"] != false {
+		t.Fatalf("play: %v", res)
+	}
+	s.wantPlayed("commit")
+	r, _, _ := s.doctor(s.root, nil, "status")
+	if !slices.Contains(r.codes(), "volume_unsupported") {
+		t.Fatalf("doctor problems %v, want volume_unsupported", r.codes())
 	}
 }
 

@@ -51,9 +51,11 @@ type Config struct {
 	Enabled bool `toml:"enabled"`
 	// Cooldown is the minimum number of seconds between two sounds for the
 	// same event from git hooks, so a burst of commits plays once. 0 = off.
-	Cooldown int   `toml:"cooldown"`
-	Commit   Event `toml:"commit"`
-	Push     Event `toml:"push"`
+	Cooldown int `toml:"cooldown"`
+	// Volume is the playback volume, 0-100, for players that support it.
+	Volume int   `toml:"volume"`
+	Commit Event `toml:"commit"`
+	Push   Event `toml:"push"`
 }
 
 // MaxCooldown caps the cooldown setting (seconds).
@@ -65,6 +67,7 @@ func Default() Config {
 		Version:  Version,
 		Enabled:  true,
 		Cooldown: 3,
+		Volume:   100,
 		Commit:   Event{Enabled: true},
 		Push:     Event{Enabled: true, When: PushSuccess},
 	}
@@ -122,6 +125,9 @@ func Load(p Paths) (Config, error) {
 	if err := validCooldown(cfg.Cooldown); err != nil {
 		return cfg, fmt.Errorf("%s: cooldown: %w", p.ConfigFile(), err)
 	}
+	if err := validVolume(cfg.Volume); err != nil {
+		return cfg, fmt.Errorf("%s: volume: %w", p.ConfigFile(), err)
+	}
 	return cfg, nil
 }
 
@@ -136,7 +142,7 @@ func Save(p Paths, cfg Config) error {
 }
 
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "cooldown", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when"}
+var Keys = []string{"enabled", "cooldown", "volume", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when"}
 
 // SoundsKey reports whether key is an "<event>.sounds" list key, and for
 // which event.
@@ -166,6 +172,8 @@ func (c *Config) Get(key string) (any, error) {
 		return c.Enabled, nil
 	case "cooldown":
 		return c.Cooldown, nil
+	case "volume":
+		return c.Volume, nil
 	}
 	ev, field, ok := c.split(key)
 	if !ok {
@@ -204,6 +212,17 @@ func (c *Config) Set(key, raw string) (changed bool, err error) {
 		}
 		changed = c.Cooldown != n
 		c.Cooldown = n
+		return changed, nil
+	case "volume":
+		n, err := strconv.Atoi(raw)
+		if err != nil {
+			return false, fmt.Errorf("invalid number %q (use a whole number, 0 to 100)", raw)
+		}
+		if err := validVolume(n); err != nil {
+			return false, err
+		}
+		changed = c.Volume != n
+		c.Volume = n
 		return changed, nil
 	}
 	ev, field, ok := c.split(key)
@@ -286,6 +305,13 @@ func unknownKey(key string) error {
 func validCooldown(n int) error {
 	if n < 0 || n > MaxCooldown {
 		return fmt.Errorf("invalid cooldown %d (use 0 to %d seconds)", n, MaxCooldown)
+	}
+	return nil
+}
+
+func validVolume(n int) error {
+	if n < 0 || n > 100 {
+		return fmt.Errorf("invalid volume %d (use 0 to 100)", n)
 	}
 	return nil
 }

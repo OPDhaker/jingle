@@ -132,6 +132,35 @@ func TestCooldown(t *testing.T) {
 	}
 }
 
+func TestVolume(t *testing.T) {
+	cfg := Default()
+	if v, _ := cfg.Get("volume"); v != 100 {
+		t.Fatalf("default volume = %v", v)
+	}
+	if changed, err := cfg.Set("volume", "40"); err != nil || !changed || cfg.Volume != 40 {
+		t.Fatalf("changed=%v err=%v volume=%d", changed, err, cfg.Volume)
+	}
+	for _, bad := range []string{"-1", "101", "50%", "0.5", ""} {
+		if _, err := cfg.Set("volume", bad); err == nil {
+			t.Errorf("accepted volume %q", bad)
+		}
+	}
+	p := testPaths(t)
+	if err := os.WriteFile(p.ConfigFile(), []byte("version = 1\nvolume = 200\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(p); err == nil {
+		t.Fatal("loaded volume 200")
+	}
+	// A config written before volume existed plays at full volume.
+	if err := os.WriteFile(p.ConfigFile(), []byte("version = 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := Load(p); err != nil || got.Volume != 100 {
+		t.Fatalf("got volume %d, %v", got.Volume, err)
+	}
+}
+
 func TestSoundPathsRelative(t *testing.T) {
 	p := testPaths(t)
 	cfg := Default()

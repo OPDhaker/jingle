@@ -109,3 +109,27 @@ func TestSoundMissingSeverity(t *testing.T) {
 		}
 	}
 }
+
+func TestVolumeUnsupported(t *testing.T) {
+	env := sandboxEnv(t)
+	t.Setenv(player.EnvOverride, "sh") // JINGLE_PLAYER gets no volume flags
+	has := func() bool {
+		for _, p := range Check(env, "").Problems {
+			if p.Code == "volume_unsupported" {
+				return p.Severity == Warning
+			}
+		}
+		return false
+	}
+	if has() {
+		t.Fatal("volume_unsupported at full volume")
+	}
+	cfg := config.Default()
+	cfg.Volume = 50
+	if err := config.Save(env.Paths, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if !has() {
+		t.Fatal("no volume_unsupported warning at volume 50")
+	}
+}

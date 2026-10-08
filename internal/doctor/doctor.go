@@ -184,6 +184,10 @@ func (r *Report) checkConfig(env hooks.Env) {
 func (r *Report) checkPlayer(env hooks.Env) {
 	if p, ok := event.DetectPlayer(); ok {
 		r.Player = &p
+		if v, ok := r.Config["volume"].(int); ok && v < 100 && !p.Volume {
+			r.add(Warning, "volume_unsupported", fmt.Sprintf("volume is %d, but %s can't change the volume, so sounds play at full volume", v, p.Name),
+				"install pw-play, paplay, or ffplay, or: jingle config set volume 100")
+		}
 		return
 	}
 	if v := env.Getenv(player.EnvOverride); v != "" {

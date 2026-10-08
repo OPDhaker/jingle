@@ -64,6 +64,9 @@ type Result struct {
 	Sound  string        `json:"sound"`
 	Sounds int           `json:"sounds"`
 	Player player.Player `json:"player"`
+	// Volume is the configured volume; the player ignores it unless
+	// Player.Volume is true.
+	Volume int `json:"volume"`
 	// Enabled is whether this event would play on a real commit/push.
 	Enabled bool `json:"enabled"`
 	Waited  bool `json:"waited"`
@@ -114,6 +117,7 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 		return res, errorf(CodeNoPlayer, "no audio player found on this machine")
 	}
 	res.Player = p
+	res.Volume = cfg.Volume
 	// Last check, so only a sound that would really play starts the cooldown.
 	cooldown := time.Duration(cfg.Cooldown) * time.Second
 	if !opts.IgnoreCooldown && !takeTurn(paths, event, cooldown, time.Now) {
@@ -121,9 +125,9 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	}
 	if opts.Wait {
 		res.Waited = true
-		err = player.Run(p, res.Sound)
+		err = player.Run(p, res.Sound, cfg.Volume)
 	} else {
-		err = player.Start(p, res.Sound)
+		err = player.Start(p, res.Sound, cfg.Volume)
 	}
 	if err != nil {
 		return res, errorf(CodePlayerFailed, "%s failed: %v", p.Name, err)
