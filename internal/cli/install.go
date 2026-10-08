@@ -24,7 +24,8 @@ core.hooksPath), with the same args, stdin, and exit status. The previous
 core.hooksPath is saved so "jingle uninstall" can restore it exactly.
 
 Repos that set their own core.hooksPath (husky and similar) override the
-global one, so jingle does not play in them.
+global one, so jingle does not play in them; "jingle doctor" run inside a
+repo reports this.
 
 Requires --yes (or --dry-run to preview). Safe to re-run: reports "unchanged".`,
 		Example: `  jingle install --dry-run --json

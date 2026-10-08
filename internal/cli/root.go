@@ -51,7 +51,7 @@ Typical setup:
   jingle install --yes
   jingle config set commit.sound ~/Music/tag.mp3
   jingle play commit
-  jingle status
+  jingle doctor
 
 Every command supports --json for machine-readable output. Errors go to
 stderr; with --json as {"error": {"code": "...", "message": "..."}}.
@@ -64,7 +64,7 @@ Exit codes:
 Error codes: usage, confirmation_required, invalid_key, invalid_value,
 unknown_event, git_not_found, install_failed, uninstall_failed,
 config_invalid, sound_not_found, no_sound, sound_missing, no_player,
-player_failed, paths_unavailable, io_error`,
+player_failed, paths_unavailable, io_error, problems_found, not_a_repo`,
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -80,6 +80,7 @@ player_failed, paths_unavailable, io_error`,
 		newConfigCmd(printer),
 		newPlayCmd(printer),
 		newStatusCmd(printer),
+		newDoctorCmd(printer),
 		newVersionCmd(printer),
 		newHookEventCmd(),
 	)

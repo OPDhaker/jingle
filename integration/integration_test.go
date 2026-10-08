@@ -459,6 +459,143 @@ func TestCooldownPlaysBurstOnce(t *testing.T) {
 	s.wantPlayed("commit", "commit")
 }
 
+// doctorReport is the part of the doctor/status JSON these tests read.
+type doctorReport struct {
+	Problems []struct {
+		Code     string `json:"code"`
+		Severity string `json:"severity"`
+		Message  string `json:"message"`
+	} `json:"problems"`
+	Repo *struct {
+		Path           string  `json:"path"`
+		HooksPath      *string `json:"hooks_path"`
+		HooksPathScope string  `json:"hooks_path_scope"`
+		Husky          bool    `json:"husky"`
+	} `json:"repo"`
+}
+
+func (r doctorReport) codes() []string {
+	var c []string
+	for _, p := range r.Problems {
+		c = append(c, p.Code)
+	}
+	return c
+}
+
+// doctor runs `jingle <args> --json` in dir with extra env and returns the
+// parsed report, stderr, and exit code.
+func (s *sandbox) doctor(dir string, env []string, args ...string) (doctorReport, string, int) {
+	s.t.Helper()
+	cmd := exec.Command(jingleBin, append(args, "--json")...)
+	cmd.Dir = dir
+	cmd.Env = append(append([]string{}, s.env...), env...)
+	var stdout, stderr strings.Builder
+	cmd.Stdout, cmd.Stderr = &stdout, &stderr
+	code := 0
+	if err := cmd.Run(); err != nil {
+		ee := (*exec.ExitError)(nil)
+		if !errors.As(err, &ee) {
+			s.t.Fatal(err)
+		}
+		code = ee.ExitCode()
+	}
+	var r doctorReport
+	if stdout.Len() > 0 {
+		if err := json.Unmarshal([]byte(stdout.String()), &r); err != nil {
+			s.t.Fatalf("jingle %v: stdout not JSON: %q", args, stdout.String())
+		}
+	}
+	return r, stderr.String(), code
+}
+
+func TestDoctorReportsAndExitCodes(t *testing.T) {
+	s := newSandbox(t)
+
+	r, stderr, code := s.doctor(s.root, nil, "doctor")
+	if code != 1 || !strings.Contains(stderr, "problems_found") {
+		t.Fatalf("fresh doctor: exit %d, stderr %q", code, stderr)
+	}
+	want := []string{"not_installed", "no_sound", "no_sound"}
+	if got := r.codes(); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("fresh doctor problems %v, want %v", got, want)
+	}
+	if r.Repo != nil {
+		t.Fatalf("checked a repo outside any repo: %+v", r.Repo)
+	}
+	// status reports the same problems but always exits 0.
+	if st, _, code := s.doctor(s.root, nil, "status"); code != 0 || len(st.Problems) != len(want) {
+		t.Fatalf("status: exit %d, problems %v", code, st.codes())
+	}
+
+	s.installWithSounds()
+	repo := s.repo("repo")
+	r, _, code = s.doctor(repo, nil, "doctor")
+	if code != 0 || len(r.Problems) != 0 {
+		t.Fatalf("healthy doctor: exit %d, problems %v", code, r.codes())
+	}
+	if r.Repo == nil || r.Repo.Path != repo || r.Repo.HooksPathScope != "global" {
+		t.Fatalf("repo info %+v", r.Repo)
+	}
+
+	// husky sets a repo-local core.hooksPath, which overrides ours.
+	s.mustGit(repo, "config", "core.hooksPath", ".husky/_")
+	for _, args := range [][]string{{"doctor"}, {"doctor", "--repo", repo}} {
+		dir := repo
+		if len(args) > 1 {
+			dir = s.root
+		}
+		r, _, code := s.doctor(dir, nil, args...)
+		if code != 1 || strings.Join(r.codes(), ",") != "repo_hooks_path_override" {
+			t.Fatalf("%v: exit %d, problems %v", args, code, r.codes())
+		}
+		if !r.Repo.Husky || r.Repo.HooksPathScope != "local" || !strings.Contains(r.Problems[0].Message, "husky") {
+			t.Fatalf("%v: repo %+v, problem %+v", args, r.Repo, r.Problems[0])
+		}
+	}
+	// status only looks at the global setup.
+	if _, _, code := s.doctor(repo, nil, "status"); code != 0 {
+		t.Fatalf("status in husky repo: exit %d", code)
+	}
+
+	if _, stderr, code := s.doctor(s.root, nil, "doctor", "--repo", s.root); code != 1 || !strings.Contains(stderr, "not_a_repo") {
+		t.Fatalf("--repo on a non-repo: exit %d, stderr %q", code, stderr)
+	}
+
+	// A deleted sound and a bad player override.
+	sounds, _ := filepath.Glob(filepath.Join(s.jingleDir, "sounds", "commit-*"))
+	for _, f := range sounds {
+		remove(t, f)
+	}
+	r, _, code = s.doctor(s.root, []string{"JINGLE_PLAYER=/nope"}, "doctor")
+	if code != 1 || strings.Join(r.codes(), ",") != "sound_missing,no_player" {
+		t.Fatalf("exit %d, problems %v", code, r.codes())
+	}
+}
+
+func TestDoctorBinaryMissing(t *testing.T) {
+	s := newSandbox(t)
+	copyBin := filepath.Join(s.root, "bin", "jingle")
+	data, err := os.ReadFile(jingleBin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeExec(t, copyBin, string(data))
+	if out, code := s.run(s.root, copyBin, "install", "--yes"); code != 0 {
+		t.Fatalf("install via copy: exit %d\n%s", code, out)
+	}
+	for _, ev := range []string{"commit", "push"} {
+		wav := filepath.Join(s.root, "tag.wav")
+		writeWAV(t, wav)
+		s.mustJingle("config", "set", ev+".sound", wav)
+	}
+	remove(t, copyBin)
+
+	r, _, code := s.doctor(s.root, []string{"PATH=/usr/bin:/bin"}, "doctor")
+	if code != 1 || strings.Join(r.codes(), ",") != "jingle_binary_missing" {
+		t.Fatalf("exit %d, problems %v", code, r.codes())
+	}
+}
+
 func TestChainsToPreviousGlobalHooksPath(t *testing.T) {
 	s := newSandbox(t)
 	prev := filepath.Join(s.root, "prev-hooks")

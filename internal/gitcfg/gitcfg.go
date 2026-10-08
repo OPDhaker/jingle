@@ -44,8 +44,15 @@ func (g Git) bin() string {
 // config never leaks into global/system reads. It returns stdout and the
 // exit code; err is set only if git could not be run or failed unexpectedly.
 func (g Git) run(args ...string) (string, int, error) {
+	return g.runIn(os.TempDir(), args...)
+}
+
+// runIn is run with dir as the working directory, for reading a repo's own
+// view of its config. Repo-pointing variables are still dropped, so dir
+// alone decides which repo git sees.
+func (g Git) runIn(dir string, args ...string) (string, int, error) {
 	cmd := exec.Command(g.bin(), args...)
-	cmd.Dir = os.TempDir()
+	cmd.Dir = dir
 	cmd.Env = append(repoFreeEnv(), "LC_ALL=C")
 	var out, errb bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errb
@@ -191,4 +198,47 @@ func (g Git) GlobalSectionHasKeys(section string) (bool, error) {
 func (g Git) RemoveGlobalSection(section string) error {
 	_, _, err := g.run("config", "--global", "--remove-section", section)
 	return err
+}
+
+// RepoRoot returns the top of the worktree containing dir, or the git dir
+// for a bare repo. ok is false if dir is not inside a repository.
+func (g Git) RepoRoot(dir string) (root string, ok bool, err error) {
+	gitDir, code, err := g.runIn(dir, "rev-parse", "--absolute-git-dir")
+	if err != nil || code != 0 {
+		return "", false, err
+	}
+	// Fails, or prints nothing, in a bare repo.
+	if top, code, err := g.runIn(dir, "rev-parse", "--show-toplevel"); err == nil && code == 0 && strings.TrimSpace(top) != "" {
+		return strings.TrimSuffix(top, "\n"), true, nil
+	}
+	return strings.TrimSuffix(gitDir, "\n"), true, nil
+}
+
+// RepoHooksPath returns the core.hooksPath git uses in the repo at dir and
+// the scope it comes from (global, local, worktree, command, ...). It sees
+// every override, including includeIf. scope is "unknown" on git < 2.26,
+// which lacks --show-scope.
+func (g Git) RepoHooksPath(dir string) (val, scope string, ok bool, err error) {
+	out, code, err := g.runIn(dir, "config", "--show-scope", "--get", "core.hooksPath")
+	if err != nil {
+		return "", "", false, err
+	}
+	if code == 129 { // unknown option
+		scope = "unknown"
+		if out, code, err = g.runIn(dir, "config", "--get", "core.hooksPath"); err != nil {
+			return "", "", false, err
+		}
+	}
+	switch code {
+	case 0:
+	case 1:
+		return "", "", false, nil
+	default:
+		return "", "", false, fmt.Errorf("git config --get core.hooksPath in %s: exit %d", dir, code)
+	}
+	out = strings.TrimSuffix(out, "\n")
+	if scope == "" {
+		scope, out, _ = strings.Cut(out, "\t")
+	}
+	return out, scope, true, nil
 }

@@ -48,13 +48,13 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 - ✅ Push sound only on a successful push (`pre-push` marker + `reference-transaction`, validated in Phase 0). "Play on attempt" fallback for pushes to a raw URL.
 - ✅ Suppress sounds during rebase and cherry-pick (detect `rebase-merge/` and `CHERRY_PICK_HEAD`); cooldown so a burst of commits plays once.
 - Merges don't fire `post-commit`; optionally add a `post-merge` event.
-- `doctor`: detects repo-local `core.hooksPath` (husky etc.), missing player, old git, broken audio path; each problem gets a fix hint.
+- ✅ `doctor`: detects repo-local `core.hooksPath` (husky etc.), missing player, old git, broken audio path; each problem gets a fix hint.
 - Opt-in husky integration.
 - Multiple sounds per event, picked at random. Volume setting.
 
 **Exit:** `doctor --json` covers every known failure mode; no sound plays on a failed push or during a rebase.
 
-**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. Decided for the next pass: `doctor` exits 1 on error-severity problems (report still on stdout); husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
+**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. **Progress (pass 2):** `jingle doctor [--repo <dir>]` reports every known failure mode with a severity (`error` stops sounds, `warning` degrades them) and a fix. It exits 1 on any error (`problems_found`, report still on stdout). It checks the repo in the current directory, or `--repo`, for an effective `core.hooksPath` that overrides ours (local, worktree, `includeIf`) and names husky. It also catches a deleted shim binary and a bad `JINGLE_PLAYER`. `status` shares the same checks (package `internal/doctor`), minus the repo check, and still exits 0. Decided for the next pass: husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
 
 ## Phase 3: Windows + distribution
 

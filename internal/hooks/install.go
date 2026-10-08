@@ -261,6 +261,17 @@ func expandHome(p, home string) string {
 	return p
 }
 
+// PointsAtHooksDir reports whether a core.hooksPath value means jingle's
+// hooks dir. A relative value is resolved against base (where git runs
+// hooks: the worktree root, or the git dir of a bare repo).
+func PointsAtHooksDir(env Env, value, base string) bool {
+	p := expandHome(value, env.Home)
+	if !filepath.IsAbs(p) {
+		p = filepath.Join(base, p)
+	}
+	return samePath(p, env.Paths.HooksDir())
+}
+
 // samePath compares two paths after cleaning and resolving symlinks.
 func samePath(a, b string) bool {
 	if filepath.Clean(a) == filepath.Clean(b) {
