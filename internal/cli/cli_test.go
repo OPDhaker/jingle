@@ -3,9 +3,13 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/output"
 )
 
@@ -91,7 +95,12 @@ func TestConfigErrors(t *testing.T) {
 	}{
 		{[]string{"config", "get", "nope"}, "invalid_key", output.ExitUsage},
 		{[]string{"config", "set", "enabled", "maybe"}, "invalid_value", output.ExitUsage},
-		{[]string{"config", "set", "commit.sound", "/no/such/file.mp3"}, "sound_not_found", output.ExitError},
+		{[]string{"config", "set", "commit.sounds", "/no/such/file.mp3"}, "sound_not_found", output.ExitError},
+		{[]string{"config", "set", "commit.sound", "x.mp3"}, "invalid_key", output.ExitUsage},
+		{[]string{"config", "set", "enabled", "on", "off"}, "usage", output.ExitUsage},
+		{[]string{"config", "add", "enabled", "x.mp3"}, "invalid_key", output.ExitUsage},
+		{[]string{"config", "remove", "commit.sounds", "nope.mp3"}, "invalid_value", output.ExitUsage},
+		{[]string{"play", "commit", "--sound", "x.mp3"}, "no_sound", output.ExitError},
 		{[]string{"play", "merge"}, "unknown_event", output.ExitUsage},
 		{[]string{"play", "commit"}, "no_sound", output.ExitError},
 	}
@@ -116,4 +125,49 @@ func TestConfigSetIsIdempotent(t *testing.T) {
 			t.Fatalf("run %d: exit %d stdout %q", i, code, stdout)
 		}
 	}
+}
+
+func TestConfigSoundsAddRemove(t *testing.T) {
+	t.Setenv("JINGLE_HOME", t.TempDir())
+	src := t.TempDir()
+	a, b := filepath.Join(src, "a.wav"), filepath.Join(src, "b.wav")
+	for _, f := range []string{a, b} {
+		if err := os.WriteFile(f, []byte("RIFF "+f), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	step := func(wantChanged bool, wantNames []string, args ...string) {
+		t.Helper()
+		code, stdout, stderr := run(append(args, "--json")...)
+		var v struct {
+			Value   []string
+			Changed bool
+		}
+		if err := json.Unmarshal([]byte(stdout), &v); err != nil || code != 0 {
+			t.Fatalf("%v: exit %d stdout %q stderr %q", args, code, stdout, stderr)
+		}
+		names := make([]string, len(v.Value))
+		for i, s := range v.Value {
+			names[i] = filepath.Base(s)
+		}
+		if v.Changed != wantChanged || !slices.Equal(names, wantNames) {
+			t.Fatalf("%v: changed=%v sounds=%v, want %v %v", args, v.Changed, names, wantChanged, wantNames)
+		}
+	}
+	step(true, []string{"commit-a.wav"}, "config", "set", "commit.sounds", a)
+	step(true, []string{"commit-a.wav", "commit-b.wav"}, "config", "add", "commit.sounds", b)
+	step(false, []string{"commit-a.wav", "commit-b.wav"}, "config", "add", "commit.sounds", a, b)
+	step(true, []string{"commit-b.wav"}, "config", "remove", "commit.sounds", "a.wav")
+	if _, err := os.Stat(a); err != nil {
+		t.Fatal("remove deleted the user's original")
+	}
+	p, err := config.ResolvePaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(p.SoundsDir(), "commit-a.wav")); !os.IsNotExist(err) {
+		t.Fatalf("jingle's copy of a.wav was not deleted: %v", err)
+	}
+	step(true, []string{}, "config", "set", "commit.sounds", "")
+	step(false, []string{}, "config", "set", "commit.sounds", "")
 }

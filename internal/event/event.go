@@ -5,9 +5,12 @@ package event
 
 import (
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/OPDhaker/jingle/internal/config"
@@ -21,6 +24,7 @@ const (
 	CodeDisabled      = "disabled"
 	CodeNoSound       = "no_sound"
 	CodeSoundMissing  = "sound_missing"
+	CodeSoundNotFound = "sound_not_found"
 	CodeNoPlayer      = "no_player"
 	CodePlayerFailed  = "player_failed"
 	// CodeCooldown: the event played too recently. Hooks only; `jingle play`
@@ -48,17 +52,25 @@ type Options struct {
 	IgnoreCooldown bool
 	// Wait blocks until the player exits instead of starting it detached.
 	Wait bool
+	// Sound plays this one of the event's sounds (see config.MatchSound)
+	// instead of a random one.
+	Sound string
 }
 
 // Result describes what Play did.
 type Result struct {
-	Event  string        `json:"event"`
+	Event string `json:"event"`
+	// Sound is the file that played, picked from the event's Sounds.
 	Sound  string        `json:"sound"`
+	Sounds int           `json:"sounds"`
 	Player player.Player `json:"player"`
 	// Enabled is whether this event would play on a real commit/push.
 	Enabled bool `json:"enabled"`
 	Waited  bool `json:"waited"`
 }
+
+// pick chooses among the sounds that exist; replaced in tests.
+var pick = func(n int) int { return rand.IntN(n) }
 
 // DetectPlayer finds the player for this machine.
 func DetectPlayer() (player.Player, bool) {
@@ -69,7 +81,7 @@ func DetectPlayer() (player.Player, bool) {
 func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	res := Result{Event: event}
 	if !config.IsEvent(event) {
-		return res, errorf(CodeUnknownEvent, "unknown event %q (valid: commit, push)", event)
+		return res, errorf(CodeUnknownEvent, "unknown event %q (valid: %s)", event, strings.Join(config.Events, ", "))
 	}
 	cfg, err := config.Load(paths)
 	if err != nil {
@@ -79,13 +91,24 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	if !res.Enabled && !opts.IgnoreEnabled {
 		return res, errorf(CodeDisabled, "%s sound is turned off", event)
 	}
-	res.Sound = cfg.SoundPath(paths, event)
-	if res.Sound == "" {
-		return res, errorf(CodeNoSound, "no sound set for %s; run: jingle config set %s.sound <file>", event, event)
+	sounds := cfg.SoundPaths(paths, event)
+	res.Sounds = len(sounds)
+	if len(sounds) == 0 {
+		return res, errorf(CodeNoSound, "no sound set for %s; run: jingle config set %s.sounds <file>", event, event)
 	}
-	if fi, err := os.Stat(res.Sound); err != nil || !fi.Mode().IsRegular() {
-		return res, errorf(CodeSoundMissing, "sound file for %s not found: %s", event, res.Sound)
+	if opts.Sound != "" {
+		entry, ok := cfg.MatchSound(paths, event, opts.Sound)
+		if !ok {
+			return res, errorf(CodeSoundNotFound, "%q is not one of the %s sounds; see: jingle config get %s.sounds", opts.Sound, event, event)
+		}
+		sounds = []string{config.SoundFile(paths, entry)}
 	}
+	// A missing file is skipped as long as another sound can play.
+	existing := slices.DeleteFunc(slices.Clone(sounds), func(s string) bool { return !isFile(s) })
+	if len(existing) == 0 {
+		return res, errorf(CodeSoundMissing, "sound file for %s not found: %s", event, strings.Join(sounds, ", "))
+	}
+	res.Sound = existing[pick(len(existing))]
 	p, ok := DetectPlayer()
 	if !ok {
 		return res, errorf(CodeNoPlayer, "no audio player found on this machine")
@@ -106,4 +129,9 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 		return res, errorf(CodePlayerFailed, "%s failed: %v", p.Name, err)
 	}
 	return res, nil
+}
+
+func isFile(p string) bool {
+	fi, err := os.Stat(p)
+	return err == nil && fi.Mode().IsRegular()
 }

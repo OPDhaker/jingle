@@ -155,11 +155,28 @@ func (r *Report) checkConfig(env hooks.Env) {
 		if !cfg.Enabled || !cfg.Event(ev).Enabled {
 			continue
 		}
-		switch path := cfg.SoundPath(env.Paths, ev); {
-		case path == "":
-			r.add(Error, "no_sound", "no sound set for "+ev, "jingle config set "+ev+".sound <file>")
-		case !isFile(path):
-			r.add(Error, "sound_missing", "sound file for "+ev+" not found: "+path, "jingle config set "+ev+".sound <file>")
+		sounds := cfg.SoundPaths(env.Paths, ev)
+		if len(sounds) == 0 {
+			r.add(Error, "no_sound", "no sound set for "+ev, "jingle config set "+ev+".sounds <file>")
+			continue
+		}
+		var missing []string
+		for _, s := range sounds {
+			if !isFile(s) {
+				missing = append(missing, s)
+			}
+		}
+		switch {
+		case len(missing) == len(sounds):
+			r.add(Error, "sound_missing", "no sound file for "+ev+" exists: "+strings.Join(missing, ", "), "jingle config set "+ev+".sounds <file>")
+		case len(missing) > 0:
+			// Another sound still plays, so this only degrades.
+			fix := make([]string, len(missing))
+			for i, m := range missing {
+				fix[i] = shellQuote(filepath.Base(m))
+			}
+			r.add(Warning, "sound_missing", "some sound files for "+ev+" are missing, so only the others play: "+strings.Join(missing, ", "),
+				"jingle config remove "+ev+".sounds "+strings.Join(fix, " "))
 		}
 	}
 }

@@ -12,7 +12,10 @@ import (
 )
 
 func newPlayCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
-	var wait bool
+	var (
+		wait  bool
+		sound string
+	)
 	cmd := &cobra.Command{
 		Use:   "play <commit|push>",
 		Short: "Play an event's sound now, to test setup",
@@ -22,9 +25,13 @@ cooldown; the result reports "enabled" so you can tell whether it would
 play on a real commit or push.
 
 By default the player starts in the background, as it does from a git hook.
-Use --wait to block until playback ends and see player errors.`,
+Use --wait to block until playback ends and see player errors.
+
+An event with several sounds plays one at random; --sound picks one (by
+its entry, original file, or file name, as "config remove" matches them).`,
 		Example: `  jingle play commit
-  jingle play push --wait --json`,
+  jingle play push --wait --json
+  jingle play commit --sound tag2.mp3 --wait`,
 		Args:      cobra.ExactArgs(1),
 		ValidArgs: []string{"commit", "push"},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,7 +39,7 @@ Use --wait to block until playback ends and see player errors.`,
 			if err != nil {
 				return err
 			}
-			res, err := event.Play(p, args[0], event.Options{IgnoreEnabled: true, IgnoreCooldown: true, Wait: wait})
+			res, err := event.Play(p, args[0], event.Options{IgnoreEnabled: true, IgnoreCooldown: true, Wait: wait, Sound: sound})
 			if err != nil {
 				var e *event.Error
 				if errors.As(err, &e) {
@@ -53,5 +60,6 @@ Use --wait to block until playback ends and see player errors.`,
 		},
 	}
 	cmd.Flags().BoolVar(&wait, "wait", false, "wait for playback to finish")
+	cmd.Flags().StringVar(&sound, "sound", "", "play this one of the event's sounds instead of a random one")
 	return cmd
 }

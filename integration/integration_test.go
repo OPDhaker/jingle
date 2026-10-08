@@ -151,7 +151,7 @@ func (s *sandbox) installWithSounds() {
 	for _, ev := range []string{"commit", "push"} {
 		wav := filepath.Join(s.root, "tag.wav")
 		writeWAV(s.t, wav)
-		s.mustJingle("config", "set", ev+".sound", wav)
+		s.mustJingle("config", "set", ev+".sounds", wav)
 	}
 }
 
@@ -459,6 +459,52 @@ func TestCooldownPlaysBurstOnce(t *testing.T) {
 	s.wantPlayed("commit", "commit")
 }
 
+func TestSeveralSoundsPlayAtRandom(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	a, b := filepath.Join(s.root, "a.wav"), filepath.Join(s.root, "b.wav")
+	writeWAV(t, a)
+	writeWAV(t, b)
+	s.mustJingle("config", "set", "commit.sounds", a, b)
+	repo := s.repo("repo")
+	const n = 16
+	for i := range n {
+		s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", fmt.Sprint(i))
+	}
+	seen := map[string]int{}
+	for _, l := range s.played(n) {
+		seen[filepath.Base(l)]++
+	}
+	// 2 * 0.5^16: a false failure is practically impossible.
+	if len(seen) != 2 || seen["commit-a.wav"] == 0 || seen["commit-b.wav"] == 0 {
+		t.Fatalf("played %v, want both commit-a.wav and commit-b.wav", seen)
+	}
+
+	remove(t, s.playLog)
+	s.mustJingle("play", "commit", "--sound", "b.wav", "--wait")
+	if got := s.played(1); len(got) != 1 || filepath.Base(got[0]) != "commit-b.wav" {
+		t.Fatalf("play --sound b.wav played %v", got)
+	}
+}
+
+func TestLegacySoundKeyStillLoads(t *testing.T) {
+	s := newSandbox(t)
+	s.mustJingle("install", "--yes")
+	wav := filepath.Join(s.root, "old.wav")
+	writeWAV(t, wav)
+	mkdir(t, s.jingleDir)
+	writeFile(t, filepath.Join(s.jingleDir, "config.toml"),
+		fmt.Sprintf("version = 1\nenabled = true\ncooldown = 0\n[commit]\nenabled = true\nsound = %q\n", wav))
+	vals := s.mustJingle("config", "list")["values"].(map[string]any)
+	if got := fmt.Sprint(vals["commit.sounds"]); got != "["+wav+"]" {
+		t.Fatalf("commit.sounds = %s, want [%s]", got, wav)
+	}
+	s.mustGit(s.repo("repo"), "commit", "-q", "--allow-empty", "-m", "one")
+	if got := s.played(1); len(got) != 1 || got[0] != wav {
+		t.Fatalf("played %v, want %s", got, wav)
+	}
+}
+
 // doctorReport is the part of the doctor/status JSON these tests read.
 type doctorReport struct {
 	Problems []struct {
@@ -586,7 +632,7 @@ func TestDoctorBinaryMissing(t *testing.T) {
 	for _, ev := range []string{"commit", "push"} {
 		wav := filepath.Join(s.root, "tag.wav")
 		writeWAV(t, wav)
-		s.mustJingle("config", "set", ev+".sound", wav)
+		s.mustJingle("config", "set", ev+".sounds", wav)
 	}
 	remove(t, copyBin)
 

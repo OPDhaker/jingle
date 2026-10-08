@@ -48,7 +48,7 @@ func printReport(w io.Writer, r doctor.Report) {
 	fmt.Fprintf(w, "config:     %s\n", r.ConfigPath)
 	for _, k := range config.Keys {
 		if v, ok := r.Config[k]; ok {
-			fmt.Fprintf(w, "  %s = %v\n", k, v)
+			fmt.Fprintf(w, "  %s = %s\n", k, formatValue(v))
 		}
 	}
 	if r.Player != nil {

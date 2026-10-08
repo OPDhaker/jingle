@@ -34,7 +34,7 @@ func setup(t *testing.T) (config.Paths, string) {
 		t.Fatal(err)
 	}
 	cfg := config.Default()
-	cfg.Push.Sound = sound
+	cfg.Push.Sounds = []string{sound}
 	if err := config.Save(p, cfg); err != nil {
 		t.Fatal(err)
 	}

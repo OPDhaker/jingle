@@ -5,6 +5,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
+	"strings"
 	"testing"
 )
 
@@ -15,7 +18,7 @@ func testPaths(t *testing.T) Paths {
 
 func TestLoadMissingIsDefault(t *testing.T) {
 	cfg, err := Load(testPaths(t))
-	if err != nil || cfg != Default() {
+	if err != nil || !reflect.DeepEqual(cfg, Default()) {
 		t.Fatalf("got %+v, %v", cfg, err)
 	}
 }
@@ -26,14 +29,14 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if _, err := cfg.Set("push.enabled", "off"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := cfg.Set("commit.sound", "/x/tag.mp3"); err != nil {
+	if _, err := cfg.Set("commit.sounds", "/x/tag.mp3"); err != nil {
 		t.Fatal(err)
 	}
 	if err := Save(p, cfg); err != nil {
 		t.Fatal(err)
 	}
 	got, err := Load(p)
-	if err != nil || got != cfg {
+	if err != nil || !reflect.DeepEqual(got, cfg) {
 		t.Fatalf("got %+v, %v; want %+v", got, err, cfg)
 	}
 }
@@ -129,15 +132,83 @@ func TestCooldown(t *testing.T) {
 	}
 }
 
-func TestSoundPathRelative(t *testing.T) {
+func TestSoundPathsRelative(t *testing.T) {
 	p := testPaths(t)
 	cfg := Default()
-	cfg.Push.Sound = "push-x.wav"
-	if got := cfg.SoundPath(p, "push"); got != filepath.Join(p.SoundsDir(), "push-x.wav") {
-		t.Fatalf("got %s", got)
+	cfg.Push.Sounds = []string{"push-x.wav", "/abs/y.wav"}
+	want := []string{filepath.Join(p.SoundsDir(), "push-x.wav"), "/abs/y.wav"}
+	if got := cfg.SoundPaths(p, "push"); !slices.Equal(got, want) {
+		t.Fatalf("got %v", got)
 	}
-	if got := cfg.SoundPath(p, "commit"); got != "" {
-		t.Fatalf("unset sound resolved to %q", got)
+	if got := cfg.SoundPaths(p, "commit"); len(got) != 0 {
+		t.Fatalf("unset sounds resolved to %v", got)
+	}
+}
+
+func TestLegacySoundMigrates(t *testing.T) {
+	p := testPaths(t)
+	body := "version = 1\n[commit]\nenabled = true\nsound = \"/a.wav\"\nsounds = [\"/b.wav\", \"/a.wav\"]\n"
+	if err := os.WriteFile(p.ConfigFile(), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(p)
+	if err != nil || !slices.Equal(cfg.Commit.Sounds, []string{"/a.wav", "/b.wav"}) || cfg.Commit.Sound != "" {
+		t.Fatalf("got %+v, %v", cfg.Commit, err)
+	}
+	if err := Save(p, cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(p.ConfigFile())
+	if strings.Contains(string(data), "sound =") {
+		t.Fatalf("legacy key written back:\n%s", data)
+	}
+}
+
+func TestSoundList(t *testing.T) {
+	cfg := Default()
+	ev := &cfg.Commit
+	if !ev.SetSounds([]string{"/a.wav", "", "/b.wav", "/a.wav"}) || !slices.Equal(ev.Sounds, []string{"/a.wav", "/b.wav"}) {
+		t.Fatalf("SetSounds: %v", ev.Sounds)
+	}
+	if ev.SetSounds([]string{"/a.wav", "/b.wav"}) {
+		t.Fatal("same list reported a change")
+	}
+	if !ev.AddSound("/c.wav") || ev.AddSound("/c.wav") {
+		t.Fatal("AddSound not idempotent")
+	}
+	if !ev.RemoveSound("/b.wav") || ev.RemoveSound("/b.wav") {
+		t.Fatal("RemoveSound not idempotent")
+	}
+	if v, _ := cfg.Get("commit.sounds"); !reflect.DeepEqual(v, []string{"/a.wav", "/c.wav"}) {
+		t.Fatalf("Get = %#v", v)
+	}
+	if v, _ := cfg.Get("push.sounds"); v == nil || len(v.([]string)) != 0 {
+		t.Fatalf("empty list Get = %#v, want []string{}", v)
+	}
+	if changed, _ := cfg.Set("commit.sounds", ""); !changed || len(ev.Sounds) != 0 {
+		t.Fatalf("clearing: %v", ev.Sounds)
+	}
+}
+
+func TestMatchSound(t *testing.T) {
+	p := testPaths(t)
+	cfg := Default()
+	cfg.Commit.Sounds = []string{filepath.Join(p.SoundsDir(), "commit-tag.wav"), filepath.Join(p.SoundsDir(), "commit-tag-2.wav")}
+	for name, want := range map[string]string{
+		cfg.Commit.Sounds[1]:        cfg.Commit.Sounds[1],
+		"commit-tag-2.wav":          cfg.Commit.Sounds[1],
+		"tag.wav":                   cfg.Commit.Sounds[0],
+		"/Users/me/Music/tag.wav":   cfg.Commit.Sounds[0],
+		"/elsewhere/commit-tag.wav": cfg.Commit.Sounds[0],
+	} {
+		if got, ok := cfg.MatchSound(p, "commit", name); !ok || got != want {
+			t.Errorf("MatchSound(%q) = %q, %v; want %q", name, got, ok, want)
+		}
+	}
+	for _, name := range []string{"", "other.wav", "tag-2.wav.bak"} {
+		if got, ok := cfg.MatchSound(p, "commit", name); ok {
+			t.Errorf("MatchSound(%q) matched %q", name, got)
+		}
 	}
 }
 
@@ -157,6 +228,22 @@ func TestImportSound(t *testing.T) {
 	// Importing the copy itself keeps its name.
 	if again, _, _ := ImportSound(p, "commit", dest); again != dest {
 		t.Fatalf("re-import of copy went to %s", again)
+	}
+
+	// A different file with the same name gets its own copy; importing either
+	// again finds its copy.
+	other := filepath.Join(t.TempDir(), "My Tag.WAV")
+	if err := os.WriteFile(other, []byte("RIFF2"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest2, wrote, err := ImportSound(p, "commit", other)
+	if err != nil || !wrote || dest2 != filepath.Join(p.SoundsDir(), "commit-My Tag-2.WAV") {
+		t.Fatalf("collision: dest=%s wrote=%v err=%v", dest2, wrote, err)
+	}
+	for src, want := range map[string]string{src: dest, other: dest2} {
+		if got, wrote, _ := ImportSound(p, "commit", src); got != want || wrote {
+			t.Fatalf("re-import %s: %s wrote=%v, want %s", src, got, wrote, want)
+		}
 	}
 
 	if _, _, err := ImportSound(p, "commit", src+".missing"); !errors.Is(err, ErrSoundNotFound) {

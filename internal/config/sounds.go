@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -21,9 +22,11 @@ var (
 )
 
 // ImportSound copies src into the sounds dir as "<event>-<name>", so moving
-// or deleting the original later doesn't break playback. It returns the
-// copy's path and whether a file was written; importing identical content
-// again writes nothing.
+// or deleting the original later doesn't break playback. If that name holds
+// different audio (another sound with the same file name), the copy becomes
+// "<event>-<stem>-2<ext>", "-3", and so on. It returns the copy's path and
+// whether a file was written; importing identical content again writes
+// nothing and returns the existing copy.
 func ImportSound(p Paths, event, src string) (dest string, wrote bool, err error) {
 	abs, err := filepath.Abs(src)
 	if err != nil {
@@ -44,11 +47,23 @@ func ImportSound(p Paths, event, src string) (dest string, wrote bool, err error
 	if !strings.HasPrefix(name, event+"-") {
 		name = event + "-" + name
 	}
-	dest = filepath.Join(p.SoundsDir(), name)
-	if cur, err := os.ReadFile(dest); err == nil && bytes.Equal(cur, data) {
-		return dest, false, nil
+	ext := filepath.Ext(name)
+	stem := strings.TrimSuffix(name, ext)
+	for i := 1; ; i++ {
+		dest = filepath.Join(p.SoundsDir(), name)
+		if i > 1 {
+			dest = filepath.Join(p.SoundsDir(), fmt.Sprintf("%s-%d%s", stem, i, ext))
+		}
+		cur, err := os.ReadFile(dest)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return dest, true, fsutil.WriteFileAtomic(dest, data, 0o644)
+		case err != nil:
+			return "", false, err
+		case bytes.Equal(cur, data):
+			return dest, false, nil
+		}
 	}
-	return dest, true, fsutil.WriteFileAtomic(dest, data, 0o644)
 }
 
 // RemoveImportedSound deletes path if it is a copy jingle made for event.

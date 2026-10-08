@@ -49,7 +49,7 @@ or git push. Install it once and it works in every repo on this machine.
 
 Typical setup:
   jingle install --yes
-  jingle config set commit.sound ~/Music/tag.mp3
+  jingle config set commit.sounds ~/Music/tag.mp3
   jingle play commit
   jingle doctor
 

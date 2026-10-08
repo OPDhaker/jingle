@@ -68,3 +68,44 @@ func TestNoPlayerNamesOverride(t *testing.T) {
 	}
 	t.Fatalf("no no_player problem in %+v", r.Problems)
 }
+
+func TestSoundMissingSeverity(t *testing.T) {
+	env := sandboxEnv(t)
+	dir := t.TempDir()
+	have, gone := filepath.Join(dir, "have.wav"), filepath.Join(dir, "gone.wav")
+	if err := os.WriteFile(have, []byte("RIFF"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config.Default()
+	cfg.Push.Enabled = false
+	for _, tt := range []struct {
+		sounds []string
+		code   string
+		sev    Severity
+	}{
+		{nil, "no_sound", Error},
+		{[]string{gone}, "sound_missing", Error},
+		{[]string{have, gone}, "sound_missing", Warning},
+		{[]string{have}, "", ""},
+	} {
+		cfg.Commit.Sounds = tt.sounds
+		if err := config.Save(env.Paths, cfg); err != nil {
+			t.Fatal(err)
+		}
+		var got []Problem
+		for _, p := range Check(env, "").Problems {
+			if p.Code == "no_sound" || p.Code == "sound_missing" {
+				got = append(got, p)
+			}
+		}
+		if tt.code == "" {
+			if len(got) != 0 {
+				t.Errorf("%v: unexpected %+v", tt.sounds, got)
+			}
+			continue
+		}
+		if len(got) != 1 || got[0].Code != tt.code || got[0].Severity != tt.sev {
+			t.Errorf("%v: got %+v, want one %s %s", tt.sounds, got, tt.sev, tt.code)
+		}
+	}
+}

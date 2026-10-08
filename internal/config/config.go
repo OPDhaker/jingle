@@ -27,8 +27,13 @@ func IsEvent(name string) bool { return slices.Contains(Events, name) }
 
 // Event holds the settings for one git event.
 type Event struct {
-	Enabled bool   `toml:"enabled"`
-	Sound   string `toml:"sound"` // absolute, or relative to the sounds dir; "" = none
+	Enabled bool `toml:"enabled"`
+	// Sounds are the files to play, one picked at random each time. Each is
+	// absolute or relative to the sounds dir.
+	Sounds []string `toml:"sounds"`
+	// Sound is the single sound of configs written before Sounds existed.
+	// Load moves it into Sounds, so it is never written back.
+	Sound string `toml:"sound,omitempty"`
 	// When is push only: PushSuccess or PushAttempt.
 	When string `toml:"when,omitempty"`
 }
@@ -101,6 +106,13 @@ func Load(p Paths) (Config, error) {
 	if cfg.Version != Version {
 		return cfg, fmt.Errorf("%s: unsupported config version %d (this jingle supports %d)", p.ConfigFile(), cfg.Version, Version)
 	}
+	for _, name := range Events {
+		ev := cfg.Event(name)
+		if ev.Sound != "" {
+			ev.Sounds = slices.Insert(slices.DeleteFunc(ev.Sounds, func(s string) bool { return s == ev.Sound }), 0, ev.Sound)
+			ev.Sound = ""
+		}
+	}
 	if cfg.Commit.When != "" {
 		return cfg, fmt.Errorf("%s: unknown keys: commit.when", p.ConfigFile())
 	}
@@ -124,12 +136,30 @@ func Save(p Paths, cfg Config) error {
 }
 
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "cooldown", "commit.enabled", "commit.sound", "push.enabled", "push.sound", "push.when"}
+var Keys = []string{"enabled", "cooldown", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when"}
+
+// SoundsKey reports whether key is an "<event>.sounds" list key, and for
+// which event.
+func SoundsKey(key string) (event string, ok bool) {
+	event, ok = strings.CutSuffix(key, ".sounds")
+	return event, ok && slices.Contains(Keys, key)
+}
+
+// SoundsKeys lists the "<event>.sounds" keys.
+func SoundsKeys() []string {
+	var keys []string
+	for _, k := range Keys {
+		if _, ok := SoundsKey(k); ok {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
 
 // ErrUnknownKey is returned by Get and Set for keys not in Keys.
 var ErrUnknownKey = errors.New("unknown config key")
 
-// Get returns the value of key (a bool, int, or string).
+// Get returns the value of key (a bool, int, string, or []string).
 func (c *Config) Get(key string) (any, error) {
 	switch key {
 	case "enabled":
@@ -147,12 +177,13 @@ func (c *Config) Get(key string) (any, error) {
 	case "when":
 		return ev.When, nil
 	}
-	return ev.Sound, nil
+	return append([]string{}, ev.Sounds...), nil // never nil: JSON []
 }
 
 // Set parses raw and assigns it to key, reporting whether the value changed.
-// Sound values are stored as given; the caller is responsible for copying the
-// file into the sounds dir first.
+// For a sounds key, raw becomes the only sound ("" clears the list). Sound
+// values are stored as given; the caller is responsible for copying the file
+// into the sounds dir first.
 func (c *Config) Set(key, raw string) (changed bool, err error) {
 	switch key {
 	case "enabled":
@@ -197,9 +228,42 @@ func (c *Config) Set(key, raw string) (changed bool, err error) {
 		ev.When = v
 		return changed, nil
 	}
-	changed = ev.Sound != raw
-	ev.Sound = raw
-	return changed, nil
+	if raw == "" {
+		return ev.SetSounds(nil), nil
+	}
+	return ev.SetSounds([]string{raw}), nil
+}
+
+// SetSounds replaces the sound list (empty entries and duplicates dropped)
+// and reports whether it changed.
+func (e *Event) SetSounds(list []string) bool {
+	var clean []string
+	for _, s := range list {
+		if s != "" && !slices.Contains(clean, s) {
+			clean = append(clean, s)
+		}
+	}
+	if slices.Equal(e.Sounds, clean) {
+		return false
+	}
+	e.Sounds = clean
+	return true
+}
+
+// AddSound appends s unless it is already in the list.
+func (e *Event) AddSound(s string) bool {
+	if s == "" || slices.Contains(e.Sounds, s) {
+		return false
+	}
+	e.Sounds = append(e.Sounds, s)
+	return true
+}
+
+// RemoveSound drops s from the list, reporting whether it was there.
+func (e *Event) RemoveSound(s string) bool {
+	n := len(e.Sounds)
+	e.Sounds = slices.DeleteFunc(e.Sounds, func(x string) bool { return x == s })
+	return len(e.Sounds) != n
 }
 
 // split resolves "<event>.<field>" to the event settings and field name.
@@ -253,15 +317,50 @@ func ParseBool(s string) (bool, error) {
 	return false, fmt.Errorf("invalid boolean %q (use true, false, on, or off)", s)
 }
 
-// SoundPath returns the absolute path of the event's sound, or "" if none is
-// set. Relative paths resolve against the sounds dir.
-func (c *Config) SoundPath(p Paths, event string) string {
+// SoundPaths returns the absolute paths of the event's sounds. Relative
+// entries resolve against the sounds dir.
+func (c *Config) SoundPaths(p Paths, event string) []string {
 	ev := c.Event(event)
-	if ev == nil || ev.Sound == "" {
-		return ""
+	if ev == nil {
+		return nil
 	}
-	if filepath.IsAbs(ev.Sound) {
-		return ev.Sound
+	paths := make([]string, len(ev.Sounds))
+	for i, s := range ev.Sounds {
+		paths[i] = SoundFile(p, s)
 	}
-	return filepath.Join(p.SoundsDir(), ev.Sound)
+	return paths
+}
+
+// MatchSound finds the list entry that name refers to: the entry itself, the
+// same file, or the same file name, with or without the "<event>-" prefix
+// jingle adds when it copies a sound in. Exact matches win over name matches.
+func (c *Config) MatchSound(p Paths, event, name string) (entry string, ok bool) {
+	ev := c.Event(event)
+	if ev == nil || name == "" {
+		return "", false
+	}
+	abs, err := filepath.Abs(name)
+	if err != nil {
+		abs = name
+	}
+	for _, s := range ev.Sounds {
+		if s == name || SoundFile(p, s) == abs {
+			return s, true
+		}
+	}
+	base := filepath.Base(name)
+	for _, s := range ev.Sounds {
+		if b := filepath.Base(s); b == base || strings.TrimPrefix(b, event+"-") == base {
+			return s, true
+		}
+	}
+	return "", false
+}
+
+// SoundFile returns the absolute path of a sounds list entry.
+func SoundFile(p Paths, s string) string {
+	if filepath.IsAbs(s) {
+		return s
+	}
+	return filepath.Join(p.SoundsDir(), s)
 }
