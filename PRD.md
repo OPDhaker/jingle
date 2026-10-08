@@ -12,7 +12,7 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 - GUI (Phase 5).
 - Per-repo configuration.
-- Sound on events other than commit and push.
+- Sound on events other than commit, push, and (opt-in) merge.
 
 ---
 
@@ -43,20 +43,22 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Result:** all of the above is in place, and `integration/` covers the exit criteria, plus chaining to a previous global `core.hooksPath`, linked worktrees, and `pre-push` stdin/args passthrough. Push played on attempt: from `pre-push`, only if there was something to send and the user's `pre-push` passed (Phase 2 changed this to success only). All 21 hooks git runs from the hooks dir get pass-through shims, adding 35–60 ms per commit on macOS depending on the run. Verified locally on macOS only.
 
-## Phase 2: Correctness & polish (in progress)
+## Phase 2: Correctness & polish ✅ done (husky deferred)
 
 - ✅ Push sound only on a successful push (`pre-push` marker + `reference-transaction`, validated in Phase 0). "Play on attempt" fallback for pushes to a raw URL.
 - ✅ Suppress sounds during rebase and cherry-pick (detect `rebase-merge/` and `CHERRY_PICK_HEAD`); cooldown so a burst of commits plays once.
-- Merges don't fire `post-commit`; optionally add a `post-merge` event.
+- ✅ Merges don't fire `post-commit`; optional `merge` event via `post-merge`.
 - ✅ `doctor`: detects repo-local `core.hooksPath` (husky etc.), missing player, old git, broken audio path; each problem gets a fix hint.
 - Opt-in husky integration. **Deferred**; see "Husky findings" below.
-- Multiple sounds per event, picked at random. Volume setting.
+- ✅ Multiple sounds per event, picked at random. Volume setting.
 
 **Exit:** `doctor --json` covers every known failure mode; no sound plays on a failed push or during a rebase.
 
 **Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. **Progress (pass 2):** `jingle doctor [--repo <dir>]` reports every known failure mode with a severity (`error` stops sounds, `warning` degrades them) and a fix. It exits 1 on any error (`problems_found`, report still on stdout). It checks the repo in the current directory, or `--repo`, for an effective `core.hooksPath` that overrides ours (local, worktree, `includeIf`) and names husky. It also catches a deleted shim binary and a bad `JINGLE_PLAYER`. `status` shares the same checks (package `internal/doctor`), minus the repo check, and still exits 0. Also verified: hook overhead is unchanged from Phase 1.
 
-**Remaining:** multiple sounds per event + volume; optional `merge` event (`post-merge`, default off); husky (deferred). Earlier sketch for multiple sounds (not yet decided): config key `<event>.sounds` as a list, still accepting the old single `sound` string; `config add`/`config remove`; `play --sound` to pick one; volume as a global 0–100 mapped to each player's flag (afplay `-v`, pw-play/paplay `--volume`, ffplay `-volume`; aplay has none).
+**Progress (pass 3):** `<event>.sound` became `<event>.sounds`, a list. `config set` replaces the list, `config add`/`config remove` change one entry, and each play picks at random among the files that exist. A missing file is a `sound_missing` warning, or an error only when every file is gone. `play --sound <name>` plays one specific sound. Old configs with `sound = "..."` load and migrate on the next save; the CLI key is gone (nothing has been released). Two different files with the same name get separate copies (`<event>-<stem>-2<ext>`). `volume` (0–100, default 100) maps to afplay `-v` and pw-play `--volume` (0–1 factor), paplay `--volume` (0–65536), and ffplay `-volume`; aplay and `JINGLE_PLAYER` get no flag, and doctor warns with `volume_unsupported`. `afplay -v` was checked on macOS; the Linux flags are unverified. The `merge` event (off by default) plays from `post-merge` only when HEAD has a second parent, so fast-forwards, fast-forward pulls, and squash merges stay quiet. A merge stopped by a conflict plays the commit sound when the resolution is committed. Hook overhead is unchanged (about 37 ms per commit on macOS).
+
+**Remaining:** husky (deferred; see below).
 
 **Husky findings (for when husky work resumes):**
 - Husky v9 sets a repo-local `core.hooksPath=.husky/_`, which overrides jingle's global one. Husky creates wrappers for 14 hooks only; it has no `reference-transaction` wrapper, so success-only push detection can't work in husky repos through husky.
