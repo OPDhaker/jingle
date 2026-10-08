@@ -49,12 +49,24 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 - ✅ Suppress sounds during rebase and cherry-pick (detect `rebase-merge/` and `CHERRY_PICK_HEAD`); cooldown so a burst of commits plays once.
 - Merges don't fire `post-commit`; optionally add a `post-merge` event.
 - ✅ `doctor`: detects repo-local `core.hooksPath` (husky etc.), missing player, old git, broken audio path; each problem gets a fix hint.
-- Opt-in husky integration.
+- Opt-in husky integration. **Deferred**; see "Husky findings" below.
 - Multiple sounds per event, picked at random. Volume setting.
 
 **Exit:** `doctor --json` covers every known failure mode; no sound plays on a failed push or during a rebase.
 
-**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. **Progress (pass 2):** `jingle doctor [--repo <dir>]` reports every known failure mode with a severity (`error` stops sounds, `warning` degrades them) and a fix. It exits 1 on any error (`problems_found`, report still on stdout). It checks the repo in the current directory, or `--repo`, for an effective `core.hooksPath` that overrides ours (local, worktree, `includeIf`) and names husky. It also catches a deleted shim binary and a bad `JINGLE_PLAYER`. `status` shares the same checks (package `internal/doctor`), minus the repo check, and still exits 0. Decided for the next pass: husky integration goes through `~/.config/husky/init.sh` and plays push on attempt, because husky has no `reference-transaction` wrapper.
+**Progress (pass 1):** no sound on a rejected, dry-run, or up-to-date push. `push.when = attempt` restores the old behavior. Raw-URL pushes and git < 2.28 fall back to it automatically. Rebase, `pull --rebase`, cherry-pick, and revert are silent, linked worktrees included. `cooldown` (default 3 s, per event) collapses bursts, and `play` ignores it. Covered in `integration/`. Verified locally on macOS only: GitHub Actions has not started any run on the repo yet (it shows no runs at all; likely a billing limit on the private repo), so Linux and Windows are still untested. **Progress (pass 2):** `jingle doctor [--repo <dir>]` reports every known failure mode with a severity (`error` stops sounds, `warning` degrades them) and a fix. It exits 1 on any error (`problems_found`, report still on stdout). It checks the repo in the current directory, or `--repo`, for an effective `core.hooksPath` that overrides ours (local, worktree, `includeIf`) and names husky. It also catches a deleted shim binary and a bad `JINGLE_PLAYER`. `status` shares the same checks (package `internal/doctor`), minus the repo check, and still exits 0. Also verified: hook overhead is unchanged from Phase 1.
+
+**Remaining:** multiple sounds per event + volume; optional `merge` event (`post-merge`, default off); husky (deferred). Earlier sketch for multiple sounds (not yet decided): config key `<event>.sounds` as a list, still accepting the old single `sound` string; `config add`/`config remove`; `play --sound` to pick one; volume as a global 0–100 mapped to each player's flag (afplay `-v`, pw-play/paplay `--volume`, ffplay `-volume`; aplay has none).
+
+**Husky findings (for when husky work resumes):**
+- Husky v9 sets a repo-local `core.hooksPath=.husky/_`, which overrides jingle's global one. Husky creates wrappers for 14 hooks only; it has no `reference-transaction` wrapper, so success-only push detection can't work in husky repos through husky.
+- `~/.config/husky/init.sh` is **not** a usable hook point. Husky's `h` script exits before sourcing it unless the repo has its own `.husky/<hook>`. Most repos have no `.husky/post-commit`, so the commit sound would never play.
+- git 2.54 added config-based hooks: `hook.<name>.event` (multi-valued) and `hook.<name>.command`, in any config scope. They run in addition to the hooks-dir hook (configured hooks first, hooks dir last), so they also run in husky repos. `hook.<name>.enabled=false` opts one repo out. This is the likely route, and on git ≥ 2.54 it could replace setting `core.hooksPath` entirely (no shims, no chaining). Spike first:
+  - Does each configured hook get the full stdin for `pre-push` and `reference-transaction`?
+  - How are exit codes combined?
+  - Do `post-commit`, `pre-push`, and `reference-transaction` all go through the hook API?
+  - How should uninstall restore the gitconfig byte for byte (a new `[hook "jingle"]` section)?
+- Until then, `doctor` reports husky repos as `repo_hooks_path_override` with `repo.husky = true`. Older git (< 2.54) has no clean way in.
 
 ## Phase 3: Windows + distribution
 

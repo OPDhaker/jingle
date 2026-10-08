@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Phase 1 of `PRD.md` (MVP, macOS + Linux) is done: `install`, `uninstall`, `config list|get|set`, `play`, `status`, and the hidden `hook-event`, with integration tests against real git (`integration/`). Phase 2 is partly done: the push sound plays only on a successful push (`push.when` config key), replayed commits (rebase, cherry-pick, revert) are silent, a per-event `cooldown` is in place, and `doctor` reports every known failure mode. Husky integration, multiple sounds, volume, and a `merge` event are still open. Phase 0 decisions are below; spikes are in `spikes/` (findings in `spikes/README.md`). **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
+Phase 1 of `PRD.md` (MVP, macOS + Linux) is done: `install`, `uninstall`, `config list|get|set`, `play`, `status`, and the hidden `hook-event`, with integration tests against real git (`integration/`). Phase 2 is partly done: the push sound plays only on a successful push (`push.when` config key), replayed commits (rebase, cherry-pick, revert) are silent, a per-event `cooldown` is in place, and `doctor` reports every known failure mode. Still open: multiple sounds per event + volume, and an optional `merge` event. Husky integration is deferred; the research is in `PRD.md` under "Husky findings" (short version: husky's `init.sh` doesn't work for most repos; git 2.54 config-based hooks are the likely route). Phase 0 decisions are below; spikes are in `spikes/` (findings in `spikes/README.md`). **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
 
 ## Commands
 
@@ -55,7 +55,7 @@ Prior art: [leomosley/tagthat](https://github.com/leomosley/tagthat) (Bun CLI) d
 
 - **Global hooks via `core.hooksPath`.** `git config --global core.hooksPath <dir>` points every repo at one shared hooks directory. Things that follow from this:
   - Once it is set, git **ignores each repo's `.git/hooks/`**. Every global hook script must find the repo's own hook (`$(git rev-parse --git-dir)/hooks/<name>`), run it, pass along its stdin and arguments, and **return its exit code**. If it doesn't, user hooks (lint, tests) stop running without any warning.
-  - A repo-level `core.hooksPath` (husky and similar tools set one) overrides the global value, so our hooks won't run in those repos. Document this, or offer an opt-in way to integrate with them.
+  - A repo-level `core.hooksPath` (husky and similar tools set one) overrides the global value, so our hooks won't run in those repos. `jingle doctor` detects this (`repo_hooks_path_override`, and it names husky). The candidate fix is git 2.54's config-based hooks (`hook.<name>.event`/`.command`), which run regardless of `core.hooksPath`; not built yet.
   - When installing, save any global `core.hooksPath` the user already has, and chain to it too. Uninstall must put the previous value back exactly.
   - `init.templateDir` is not a substitute. It only affects repos cloned or initialized after it is set.
 - **Commit hook = `post-commit`.** It runs after the commit succeeds and cannot affect the commit. Note that it also fires on `--amend`.
