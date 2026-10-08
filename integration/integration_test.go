@@ -445,6 +445,46 @@ func TestPullRebaseIsQuiet(t *testing.T) {
 	s.wantPlayed()
 }
 
+func TestMergePlaysOnlyForMergeCommits(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	s.mustJingle("config", "set", "commit.enabled", "off")
+	wav := filepath.Join(s.root, "merge.wav")
+	writeWAV(t, wav)
+	s.mustJingle("config", "set", "merge.sounds", wav)
+	repo := s.repo("repo")
+	s.change(repo, "a", "base")
+	branch := func(name string) {
+		s.mustGit(repo, "checkout", "-q", "-b", name, "main")
+		s.change(repo, name, name)
+		s.mustGit(repo, "checkout", "-q", "main")
+	}
+
+	// Off by default.
+	branch("off")
+	s.mustGit(repo, "merge", "-q", "--no-ff", "-m", "merge off", "off")
+	s.wantPlayed()
+
+	s.mustJingle("config", "set", "merge.enabled", "on")
+	branch("ff")
+	s.mustGit(repo, "merge", "-q", "--ff-only", "ff")
+	branch("squash")
+	s.mustGit(repo, "merge", "-q", "--squash", "squash")
+	s.mustGit(repo, "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", "squashed")
+	s.wantPlayed()
+
+	branch("real")
+	s.mustGit(repo, "merge", "-q", "--no-ff", "-m", "merge real", "real")
+	s.wantPlayed("merge")
+
+	// A fast-forward pull is not a merge.
+	clone := filepath.Join(s.root, "clone")
+	s.mustGit(s.root, "clone", "-q", repo, clone)
+	s.change(repo, "a", "upstream")
+	s.mustGit(clone, "pull", "-q", "--no-rebase", "--ff")
+	s.wantPlayed("merge")
+}
+
 func TestCooldownPlaysBurstOnce(t *testing.T) {
 	s := newSandbox(t)
 	s.installWithSounds()

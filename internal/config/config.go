@@ -20,7 +20,7 @@ import (
 const Version = 1
 
 // Events are the git events jingle can play a sound for.
-var Events = []string{"commit", "push"}
+var Events = []string{"commit", "push", "merge"}
 
 // IsEvent reports whether name is one of Events.
 func IsEvent(name string) bool { return slices.Contains(Events, name) }
@@ -56,6 +56,8 @@ type Config struct {
 	Volume int   `toml:"volume"`
 	Commit Event `toml:"commit"`
 	Push   Event `toml:"push"`
+	// Merge plays for merge commits only (not fast-forwards); off by default.
+	Merge Event `toml:"merge"`
 }
 
 // MaxCooldown caps the cooldown setting (seconds).
@@ -70,6 +72,7 @@ func Default() Config {
 		Volume:   100,
 		Commit:   Event{Enabled: true},
 		Push:     Event{Enabled: true, When: PushSuccess},
+		Merge:    Event{Enabled: false},
 	}
 }
 
@@ -80,6 +83,8 @@ func (c *Config) Event(name string) *Event {
 		return &c.Commit
 	case "push":
 		return &c.Push
+	case "merge":
+		return &c.Merge
 	}
 	return nil
 }
@@ -116,8 +121,10 @@ func Load(p Paths) (Config, error) {
 			ev.Sound = ""
 		}
 	}
-	if cfg.Commit.When != "" {
-		return cfg, fmt.Errorf("%s: unknown keys: commit.when", p.ConfigFile())
+	for _, ev := range []string{"commit", "merge"} {
+		if cfg.Event(ev).When != "" {
+			return cfg, fmt.Errorf("%s: unknown keys: %s.when", p.ConfigFile(), ev)
+		}
 	}
 	if err := validWhen(cfg.Push.When); err != nil {
 		return cfg, fmt.Errorf("%s: push.when: %w", p.ConfigFile(), err)
@@ -142,7 +149,7 @@ func Save(p Paths, cfg Config) error {
 }
 
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "cooldown", "volume", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when"}
+var Keys = []string{"enabled", "cooldown", "volume", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when", "merge.enabled", "merge.sounds"}
 
 // SoundsKey reports whether key is an "<event>.sounds" list key, and for
 // which event.

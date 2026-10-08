@@ -86,6 +86,17 @@ func TestReferenceTransactionFastPath(t *testing.T) {
 	}
 }
 
+func TestPostMergePlaysMergeWithoutReplayCheck(t *testing.T) {
+	c := ShimConfig{Jingle: "/j", Self: "/self", Run: "/run"}
+	merge, commit := string(RenderShim("post-merge", c)), string(RenderShim("post-commit", c))
+	if !strings.Contains(merge, "\nplay merge\n") || strings.Contains(merge, "rebase-merge") || strings.Contains(merge, "input=$(cat)") {
+		t.Fatalf("post-merge shim:\n%s", merge)
+	}
+	if !strings.Contains(commit, "\nplay commit\n") || !strings.Contains(commit, "rebase-merge") {
+		t.Fatalf("post-commit shim:\n%s", commit)
+	}
+}
+
 func TestIsManaged(t *testing.T) {
 	if IsManaged([]byte("#!/bin/sh\necho user hook\n")) {
 		t.Fatal("user hook reported as managed")

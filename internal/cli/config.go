@@ -27,6 +27,9 @@ const configKeysHelp = `Keys:
   push.when        success|attempt
                                success (default): play once the push went
                                through; attempt: play when pre-push passes
+  merge.enabled    true|false  play when a merge makes a merge commit (default
+                               off; fast-forwards and squashes stay quiet)
+  merge.sounds     <file>...   sounds for merges; one is picked at random
 
 Booleans also accept on/off. Sound files (` + "mp3 wav aiff aif m4a ogg flac" + `) are
 copied into jingle's data dir, so moving the original later is fine.
@@ -35,7 +38,8 @@ copied into jingle's data dir, so moving the original later is fine.
 
 push.when success needs git 2.28+. With older git, and for pushes to a URL
 rather than a named remote (no remote-tracking ref moves), push plays on
-attempt.`
+attempt. A merge that stops on a conflict plays the commit sound when you
+commit the resolution.`
 
 func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 	cmd := &cobra.Command{

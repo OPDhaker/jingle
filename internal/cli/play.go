@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/event"
 	"github.com/OPDhaker/jingle/internal/output"
 )
@@ -17,7 +18,7 @@ func newPlayCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 		sound string
 	)
 	cmd := &cobra.Command{
-		Use:   "play <commit|push>",
+		Use:   "play <commit|push|merge>",
 		Short: "Play an event's sound now, to test setup",
 		Long: `Play the sound configured for an event, without committing or pushing.
 Plays even if the event (or jingle) is turned off, and ignores the
@@ -33,7 +34,7 @@ its entry, original file, or file name, as "config remove" matches them).`,
   jingle play push --wait --json
   jingle play commit --sound tag2.mp3 --wait`,
 		Args:      cobra.ExactArgs(1),
-		ValidArgs: []string{"commit", "push"},
+		ValidArgs: config.Events,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p, err := paths()
 			if err != nil {

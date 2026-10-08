@@ -133,7 +133,7 @@ func (r *Report) checkInstall(env hooks.Env) {
 		r.add(Error, "not_installed", "jingle's hooks are not installed", "jingle install --yes")
 		return
 	case !in.ShimsCurrent:
-		r.add(Warning, "shims_outdated", "the installed hook scripts differ from what this jingle writes; they still run, but push may play on attempt rather than on success", "jingle install --yes")
+		r.add(Warning, "shims_outdated", "the installed hook scripts differ from what this jingle writes; they still run, but newer behavior (such as push on success, or the merge event) may be missing", "jingle install --yes")
 	}
 	if in.JinglePath != "" && !isExecutable(in.JinglePath) {
 		if onPath, err := exec.LookPath("jingle"); err == nil {

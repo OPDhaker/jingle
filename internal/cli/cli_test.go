@@ -101,7 +101,7 @@ func TestConfigErrors(t *testing.T) {
 		{[]string{"config", "add", "enabled", "x.mp3"}, "invalid_key", output.ExitUsage},
 		{[]string{"config", "remove", "commit.sounds", "nope.mp3"}, "invalid_value", output.ExitUsage},
 		{[]string{"play", "commit", "--sound", "x.mp3"}, "no_sound", output.ExitError},
-		{[]string{"play", "merge"}, "unknown_event", output.ExitUsage},
+		{[]string{"play", "deploy"}, "unknown_event", output.ExitUsage},
 		{[]string{"play", "commit"}, "no_sound", output.ExitError},
 	}
 	for _, tt := range tests {

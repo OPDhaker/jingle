@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/OPDhaker/jingle/internal/config"
+	"github.com/OPDhaker/jingle/internal/gitcfg"
 	"github.com/OPDhaker/jingle/internal/player"
 )
 
@@ -74,6 +75,19 @@ type Result struct {
 
 // pick chooses among the sounds that exist; replaced in tests.
 var pick = func(n int) int { return rand.IntN(n) }
+
+// headIsMerge is replaced in tests.
+var headIsMerge = func() bool { return gitcfg.Git{}.HeadIsMerge() }
+
+// MergeDone runs from post-merge. A merge that fast-forwarded or squashed
+// made no merge commit, so it stays silent: pulling isn't merging.
+func MergeDone(paths config.Paths) (played bool, err error) {
+	if !headIsMerge() {
+		return false, nil
+	}
+	_, err = Play(paths, "merge", Options{})
+	return err == nil, err
+}
 
 // DetectPlayer finds the player for this machine.
 func DetectPlayer() (player.Player, bool) {

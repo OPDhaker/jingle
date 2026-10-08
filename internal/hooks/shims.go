@@ -91,13 +91,14 @@ play() {
 	[ -x "$j" ] || j=$(command -v jingle 2>/dev/null) || return 0
 	"$j" hook-event "$@" >/dev/null 2>&1 </dev/null &
 }
-{{- if eq .Hook "post-commit"}}
+{{- if or (eq .Hook "post-commit") (eq .Hook "post-merge")}}
 
 status=0
 if [ -n "$target" ]; then
 	"$target" "$@"
 	status=$?
 fi
+{{- if eq .Hook "post-commit"}}
 # Rebase, cherry-pick, and revert fire post-commit once per replayed commit:
 # stay quiet while one is in progress. Checked here, not in jingle, because
 # git removes the state as soon as the last commit is replayed.
@@ -114,7 +115,8 @@ if [ -n "$gd" ]; then
 		[ -e "$gd/$f" ] && exit "$status"
 	done
 fi
-play commit
+{{- end}}
+play {{.Event}}
 exit "$status"
 {{- else}}
 
@@ -150,6 +152,7 @@ exit "$status"
 // events maps the hooks that take part in playing a sound to their event.
 var events = map[string]string{
 	"post-commit":           "commit",
+	"post-merge":            "merge",
 	"pre-push":              "push",
 	"reference-transaction": "push",
 }
@@ -157,6 +160,7 @@ var events = map[string]string{
 // does describes, for the shim header, what a hook adds beyond chaining.
 var does = map[string]string{
 	"post-commit":           "plays the commit sound in the background, except mid-rebase, cherry-pick, or revert",
+	"post-merge":            "plays the merge sound in the background if the merge made a merge commit",
 	"pre-push":              "marks the push for reference-transaction",
 	"reference-transaction": "plays the push sound once a marked push succeeds",
 }

@@ -48,6 +48,7 @@ func TestLoadRejectsUnknownKeysAndVersions(t *testing.T) {
 		"bad toml":    "enabled = \n",
 		"commit.when": "version = 1\n[commit]\nwhen = \"attempt\"\n",
 		"bad when":    "version = 1\n[push]\nwhen = \"sometimes\"\n",
+		"merge.when":  "version = 1\n[merge]\nwhen = \"attempt\"\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			p := testPaths(t)
@@ -75,7 +76,7 @@ func TestGetSet(t *testing.T) {
 	if _, err := cfg.Set("enabled", "yes please"); err == nil {
 		t.Fatal("accepted a bad boolean")
 	}
-	for _, k := range []string{"nope", "commit", "commit.volume", "commit.when", "merge.enabled"} {
+	for _, k := range []string{"nope", "commit", "commit.volume", "commit.when", "merge.when"} {
 		if _, err := cfg.Get(k); !errors.Is(err, ErrUnknownKey) {
 			t.Errorf("Get(%q): %v", k, err)
 		}
@@ -129,6 +130,16 @@ func TestCooldown(t *testing.T) {
 	}
 	if _, err := Load(p); err == nil {
 		t.Fatal("loaded a negative cooldown")
+	}
+}
+
+func TestMergeIsOffByDefault(t *testing.T) {
+	cfg := Default()
+	if v, _ := cfg.Get("merge.enabled"); v != false {
+		t.Fatalf("merge.enabled = %v", v)
+	}
+	if changed, err := cfg.Set("merge.enabled", "on"); err != nil || !changed || !cfg.Merge.Enabled {
+		t.Fatalf("changed=%v err=%v", changed, err)
 	}
 }
 

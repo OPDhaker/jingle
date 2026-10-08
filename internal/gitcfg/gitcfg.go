@@ -242,3 +242,11 @@ func (g Git) RepoHooksPath(dir string) (val, scope string, ok bool, err error) {
 	}
 	return out, scope, true, nil
 }
+
+// HeadIsMerge reports whether HEAD of the repo in the current directory is
+// a merge commit (has a second parent). Unlike the config reads, it keeps
+// the environment, since a hook's GIT_DIR names the repo it runs for.
+func (g Git) HeadIsMerge() bool {
+	cmd := exec.Command(g.bin(), "rev-parse", "-q", "--verify", "HEAD^2")
+	return cmd.Run() == nil
+}

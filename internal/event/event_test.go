@@ -84,3 +84,30 @@ func TestPlayAllSoundsMissingOrNone(t *testing.T) {
 		t.Fatalf("none set: %v", err)
 	}
 }
+
+func TestMergeDonePlaysOnlyForMergeCommits(t *testing.T) {
+	p, log := setup(t)
+	merge := filepath.Join(t.TempDir(), "merge.wav")
+	if err := os.WriteFile(merge, []byte("RIFF"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := config.Load(p)
+	cfg.Cooldown = 0
+	cfg.Merge = config.Event{Enabled: true, Sounds: []string{merge}}
+	if err := config.Save(p, cfg); err != nil {
+		t.Fatal(err)
+	}
+	isMerge := false
+	old := headIsMerge
+	headIsMerge = func() bool { return isMerge }
+	t.Cleanup(func() { headIsMerge = old })
+
+	if played, err := MergeDone(p); played || err != nil {
+		t.Fatalf("fast-forward: played=%v err=%v", played, err)
+	}
+	isMerge = true
+	if played, err := MergeDone(p); !played || err != nil {
+		t.Fatalf("merge commit: played=%v err=%v", played, err)
+	}
+	waitLines(t, log, 1)
+}
