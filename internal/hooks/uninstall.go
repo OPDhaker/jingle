@@ -3,8 +3,10 @@ package hooks
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
+	"strings"
 
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/fsutil"
@@ -13,8 +15,9 @@ import (
 // Uninstall undoes Install: it restores the previous global core.hooksPath
 // (or unsets it, removing a [core] section or gitconfig file that install
 // created), removes the shims, the run dir, and state.json. Config and sounds are
-// kept. It is idempotent: with nothing to undo it reports "unchanged".
-func Uninstall(env Env, dryRun bool) (Result, error) {
+// kept unless purge is set. It is idempotent: with nothing to undo it reports
+// "unchanged".
+func Uninstall(env Env, dryRun, purge bool) (Result, error) {
 	hooksDir := env.Paths.HooksDir()
 	res := Result{HooksDir: hooksDir, Changes: []Change{}}
 
@@ -67,6 +70,13 @@ func Uninstall(env Env, dryRun bool) (Result, error) {
 	if fileExists(env.Paths.StateFile()) {
 		res.Changes = append(res.Changes, Change{Action: "remove_state", Target: env.Paths.StateFile()})
 	}
+	var purged []Change
+	if purge {
+		var notes []string
+		purged, notes = purgePlan(env.Paths)
+		res.Changes = append(res.Changes, purged...)
+		res.Notes = append(res.Notes, notes...)
+	}
 
 	switch {
 	case len(res.Changes) == 0:
@@ -106,8 +116,68 @@ func Uninstall(env Env, dryRun bool) (Result, error) {
 	if err := config.RemoveState(env.Paths); err != nil {
 		return res, err
 	}
+	if err := applyPurge(purged); err != nil {
+		return res, err
+	}
 	res.Status = "uninstalled"
 	return res, nil
+}
+
+// owned are the names jingle creates in its config and data dirs. Purge
+// removes a dir only when nothing else is in it.
+var owned = map[string]bool{"config.toml": true, "sounds": true, "hooks": true, "run": true, "state.json": true}
+
+// purgePlan lists what --purge deletes: the config file, the imported sounds,
+// and the config and data dirs once they are empty. Only what jingle owns is
+// deleted, so a JINGLE_HOME or XDG dir that holds other files keeps them.
+func purgePlan(p config.Paths) (changes []Change, notes []string) {
+	if fileExists(p.ConfigFile()) {
+		changes = append(changes, Change{Action: "remove_file", Target: p.ConfigFile()})
+	}
+	if fileExists(p.SoundsDir()) {
+		changes = append(changes, Change{Action: "remove_dir", Target: p.SoundsDir(), Note: "imported sounds"})
+	}
+	dirs := []string{p.ConfigDir}
+	if !samePath(p.DataDir, p.ConfigDir) {
+		dirs = append(dirs, p.DataDir)
+	}
+	for _, d := range dirs {
+		entries, err := os.ReadDir(d)
+		if err != nil {
+			continue // already gone
+		}
+		var others []string
+		for _, e := range entries {
+			if !owned[e.Name()] {
+				others = append(others, e.Name())
+			}
+		}
+		if len(others) > 0 {
+			notes = append(notes, fmt.Sprintf("kept %s: it holds files jingle did not create (%s)", d, strings.Join(others, ", ")))
+			continue
+		}
+		changes = append(changes, Change{Action: "remove_dir", Target: d, Note: "only if empty"})
+	}
+	return changes, notes
+}
+
+// applyPurge carries out purgePlan's changes, in order.
+func applyPurge(changes []Change) error {
+	for _, c := range changes {
+		var err error
+		switch {
+		case c.Action == "remove_file":
+			err = os.Remove(c.Target)
+		case c.Note == "imported sounds":
+			err = os.RemoveAll(c.Target)
+		default:
+			_ = os.Remove(c.Target) // fails, harmlessly, if the dir is not empty
+		}
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
 
 // cleanupGitconfig removes what setting core.hooksPath created: an empty

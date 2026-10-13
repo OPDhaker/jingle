@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -786,6 +787,59 @@ func TestUninstallRestoresGitconfigByteForByte(t *testing.T) {
 				t.Fatal("hooks dir left behind")
 			}
 		})
+	}
+}
+
+func TestUninstallPurgeLeavesNothing(t *testing.T) {
+	s := newSandbox(t)
+	original := "[user]\n\tname = someone\n"
+	writeFile(t, s.gitconfig, original)
+	s.installWithSounds()
+	s.mustGit(s.repo("r"), "commit", "-q", "--allow-empty", "-m", "first")
+	s.wantPlayed("commit")
+
+	dry := s.mustJingle("uninstall", "--yes", "--purge", "--dry-run")
+	if dry["status"] != "would_change" {
+		t.Fatalf("dry-run status %v", dry["status"])
+	}
+	if _, err := os.Stat(filepath.Join(s.jingleDir, "config.toml")); err != nil {
+		t.Fatal("dry-run deleted the config")
+	}
+
+	if res := s.mustJingle("uninstall", "--yes", "--purge"); res["status"] != "uninstalled" {
+		t.Fatalf("status %v", res["status"])
+	}
+	if data, _ := os.ReadFile(s.gitconfig); string(data) != original {
+		t.Fatalf("gitconfig after purge:\n%q\nwant\n%q", data, original)
+	}
+	if _, err := os.Stat(s.jingleDir); !errors.Is(err, fs.ErrNotExist) {
+		entries, _ := os.ReadDir(s.jingleDir)
+		t.Fatalf("JINGLE_HOME left behind (err %v, entries %v)", err, entries)
+	}
+	if res := s.mustJingle("uninstall", "--yes", "--purge"); res["status"] != "unchanged" {
+		t.Fatalf("second purge status %v", res["status"])
+	}
+}
+
+func TestPurgeKeepsFilesJingleDidNotCreate(t *testing.T) {
+	s := newSandbox(t)
+	s.installWithSounds()
+	mine := filepath.Join(s.jingleDir, "notes.txt")
+	writeFile(t, mine, "mine")
+
+	res := s.mustJingle("uninstall", "--yes", "--purge")
+	if res["status"] != "uninstalled" {
+		t.Fatalf("status %v", res["status"])
+	}
+	if _, err := os.Stat(mine); err != nil {
+		t.Fatalf("purge deleted a file it does not own: %v", err)
+	}
+	entries, _ := os.ReadDir(s.jingleDir)
+	if len(entries) != 1 {
+		t.Fatalf("left %v, want only notes.txt", entries)
+	}
+	if notes, _ := res["notes"].([]any); len(notes) == 0 {
+		t.Fatal("no note about the kept dir")
 	}
 }
 

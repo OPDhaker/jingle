@@ -10,7 +10,7 @@ import (
 )
 
 func newUninstallCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
-	var yes, dryRun bool
+	var yes, dryRun, purge bool
 	cmd := &cobra.Command{
 		Use:   "uninstall",
 		Short: "Turn off jingle everywhere and restore your git config",
@@ -21,11 +21,15 @@ too, so the file ends up byte-for-byte as before.
 
 If something else changed core.hooksPath after install, it is left alone.
 Your config and imported sounds are kept, so a later install picks them up.
+With --purge they are deleted too, along with jingle's config and data dirs
+(a dir is kept if it holds files jingle did not create). The jingle binary
+itself is not removed; delete it with your package manager or rm.
 
 Requires --yes (or --dry-run to preview). Safe to re-run: reports "unchanged".`,
 		Example: `  jingle uninstall --dry-run --json
   jingle uninstall --yes
-  jingle uninstall --yes --json`,
+  jingle uninstall --yes --json
+  jingle uninstall --yes --purge`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if !yes && !dryRun {
@@ -36,7 +40,7 @@ Requires --yes (or --dry-run to preview). Safe to re-run: reports "unchanged".`,
 			if err != nil {
 				return err
 			}
-			res, err := hooks.Uninstall(env, dryRun)
+			res, err := hooks.Uninstall(env, dryRun, purge)
 			if err != nil {
 				return gitError("uninstall_failed", err)
 			}
@@ -44,6 +48,7 @@ Requires --yes (or --dry-run to preview). Safe to re-run: reports "unchanged".`,
 		},
 	}
 	cmd.Flags().BoolVar(&yes, "yes", false, "confirm changing global git config")
+	cmd.Flags().BoolVar(&purge, "purge", false, "also delete jingle's config and imported sounds")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "print what would change without changing anything")
 	return cmd
 }
