@@ -2,12 +2,14 @@
 
 Copy for each section, top to bottom. Notes for design and build are in *[brackets]*.
 
+*[Colors: two only, the same as the app. Paper `#EFEDE3`, ink `#302F2C`. Every other shade is a tint of ink over paper.]*
+
 ---
 
 ## Meta
 
 - **Page title:** jingle: a producer tag for every git commit and push
-- **Description:** jingle plays a short sound when you commit or push. Install it once and it works in every repo. Your hooks keep running, and uninstall puts your git config back exactly as it was. macOS and Linux.
+- **Description:** jingle plays a short sound when you commit or push. Install it once and it works in every repo. Your hooks keep running, and uninstall puts your git config back exactly as it was. For macOS and Linux, with a menu-bar app for Mac.
 - **Hero image alt text:** A snarling white wolf, black-and-white photo.
 
 ---
@@ -17,9 +19,8 @@ Copy for each section, top to bottom. Notes for design and build are in *[bracke
 - Logo → home (`gui/assets/jingle.svg`; `gui/assets/jingle-light.svg` on dark backgrounds)
 - **Docs** → GitHub README
 - GitHub icon → https://github.com/OPDhaker/jingle
+- **Mac app** → scrolls to section 5
 - **Install** button → scrolls to section 4
-
-*[Rename "Download" to "Install". jingle is a CLI with no app to download, and no release is tagged yet. Once `v0.1.0` ships, you can point a secondary link at GitHub Releases.]*
 
 ---
 
@@ -30,13 +31,16 @@ Copy for each section, top to bottom. Notes for design and build are in *[bracke
 A producer tag on every `git commit` and `git push`. Install it once and it works in every repo.
 
 ```sh
+brew trust opdhaker/tap
 brew install OPDhaker/tap/jingle
 jingle install --yes
 ```
 
-*[Show both lines in the copy box; the copy button copies both. The second line is what turns the sound on.]*
+*[Show all three lines in the copy box; the copy button copies them all. The first is a one-time Homebrew step for third-party taps; the last is what turns the sound on.]*
 
-macOS and Linux · Free and open source (MIT)
+Rather click than type? **Get the Mac app →** *[scrolls to section 5]*
+
+macOS and Linux · Free and open source (MIT) · v0.1.0
 
 ---
 
@@ -59,14 +63,17 @@ No audio files needed. jingle comes with four sounds and starts with sensible de
 
 ## 4. Install
 
-### Two commands. Every repo.
+### A minute to set up. Every repo.
 
 **Homebrew**
 
 ```sh
+brew trust opdhaker/tap
 brew install OPDhaker/tap/jingle
 jingle install --yes
 ```
+
+*[Small note under the Homebrew tab: "`brew trust` is a one-time step Homebrew 7 asks for with any third-party tap."]*
 
 **Install script** (puts the binary in `~/.local/bin`, no sudo, checks the sha256)
 
@@ -89,11 +96,32 @@ jingle play commit
 jingle doctor
 ```
 
-*[Tabs: Homebrew / Script / Go, each with a copy button.]*
+*[Tabs: Homebrew / Script / Go, each with a copy button. Under the tabs, a small link: "All downloads on GitHub Releases" → https://github.com/OPDhaker/jingle/releases/latest]*
 
 ---
 
-## 5. How it works
+## 5. Mac app
+
+### All of it, from the menu bar.
+
+The jingle mark sits in your menu bar. Click it to mute jingle, switch commit, push, and merge on or off, or play a sound. The settings window does the rest: turn jingle on, add, preview, and remove sounds, set the volume, and see anything that would stop a sound from playing.
+
+It runs the same `jingle` underneath, so the app and your terminal always agree. Change a setting in one and it shows up in the other.
+
+```sh
+brew trust opdhaker/tap
+brew install --cask OPDhaker/tap/jingle-app
+```
+
+*[Copy box. Under it: "Also installs the jingle command-line tool."]*
+
+Or **download the app** (Apple Silicon and Intel, macOS 11 or later) → https://github.com/OPDhaker/jingle/releases/latest/download/Jingle_macos_universal.dmg
+
+*[Secondary button. Under it, small and muted: "First open: macOS asks you to confirm it in System Settings → Privacy & Security → Open Anyway. The Homebrew install skips this." Screenshot of the settings window next to the copy, light and dark.]*
+
+---
+
+## 6. How it works
 
 ### Commit. Push. Hear it.
 
@@ -105,7 +133,7 @@ jingle doctor
 
 ---
 
-## 6. Safe to install
+## 7. Safe to install
 
 ### It stays out of git's way.
 
@@ -120,7 +148,7 @@ jingle uninstall --yes --purge
 
 ---
 
-## 7. Bring your own tag
+## 8. Bring your own tag
 
 ### Your sound, your signature.
 
@@ -137,7 +165,7 @@ Plays mp3, wav, aiff, m4a, ogg, and flac.
 
 ---
 
-## 8. Let your agent set it up
+## 9. Let your agent set it up
 
 ### Built for AI agents.
 
@@ -153,7 +181,7 @@ Ask Claude Code, or any coding agent, to "set up jingle". It installs, configure
 
 ---
 
-## 9. FAQ
+## 10. FAQ
 
 **Does it work in every repo?**
 Yes, with one exception. Repos that manage their own hooks with husky (or that set their own `core.hooksPath`) override jingle, so it stays silent there. `jingle doctor`, run inside the repo, tells you when this happens.
@@ -170,17 +198,23 @@ macOS (uses `afplay`, built in) or Linux (`pw-play`, `paplay`, `aplay`, or `ffpl
 **Windows?**
 Planned, not supported yet.
 
+**Is there an app?**
+Yes, for macOS: a menu-bar app that does everything the CLI does, by clicking. `brew trust opdhaker/tap`, then `brew install --cask OPDhaker/tap/jingle-app`, or download it from GitHub Releases. It needs the jingle CLI, and the Homebrew install brings it along.
+
+**Why does macOS say it can't verify Jingle?**
+The app isn't notarized by Apple yet. The first time you open the downloaded app, go to System Settings → Privacy & Security and click **Open Anyway**. You only do this once. Installing with Homebrew avoids it.
+
 **What if I delete the binary without uninstalling?**
 git keeps working. The hooks skip the sound and still run your own hooks. Run `jingle uninstall` first for a clean removal.
 
 ---
 
-## 10. Footer
+## 11. Footer
 
 **jingle**: a producer tag for your git.
 
-GitHub · Docs · MIT License
+GitHub · Docs · Releases · MIT License
 
 ```sh
-brew install OPDhaker/tap/jingle && jingle install --yes
+brew trust opdhaker/tap && brew install OPDhaker/tap/jingle && jingle install --yes
 ```
