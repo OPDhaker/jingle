@@ -109,6 +109,10 @@ func TestConfigErrors(t *testing.T) {
 		{[]string{"config", "set", "commit.sounds", ""}, "", output.ExitOK},
 		{[]string{"play", "commit", "--sound", "x.mp3"}, "no_sound", output.ExitError},
 		{[]string{"play", "commit"}, "no_sound", output.ExitError},
+		{[]string{"preview", "builtin:boom"}, "", output.ExitOK}, // needs no sounds list
+		{[]string{"preview", "builtin:nope"}, "invalid_value", output.ExitUsage},
+		{[]string{"preview", "/no/such/file.mp3"}, "sound_not_found", output.ExitError},
+		{[]string{"preview"}, "usage", output.ExitUsage},
 	}
 	for _, tt := range tests {
 		code, _, stderr := run(append(tt.args, "--json")...)
@@ -176,4 +180,51 @@ func TestConfigSoundsAddRemove(t *testing.T) {
 	}
 	step(true, []string{}, "config", "set", "commit.sounds", "")
 	step(false, []string{}, "config", "set", "commit.sounds", "")
+}
+
+func TestPreviewPlaysWithoutChangingConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("JINGLE_HOME", home)
+	log := filepath.Join(t.TempDir(), "played")
+	player := filepath.Join(t.TempDir(), "player")
+	writeTestFile(t, player, "#!/bin/sh\necho \"$1\" >> '"+log+"'\n", 0o755)
+	t.Setenv("JINGLE_PLAYER", player)
+	src := t.TempDir()
+	wav, txt := filepath.Join(src, "tag.wav"), filepath.Join(src, "notes.txt")
+	writeTestFile(t, wav, "RIFF fake", 0o644)
+	writeTestFile(t, txt, "hi", 0o644)
+
+	code, stdout, stderr := run("preview", wav, "--wait", "--json")
+	var res struct{ Sound, File string }
+	if err := json.Unmarshal([]byte(stdout), &res); err != nil || code != 0 {
+		t.Fatalf("exit %d stdout %q stderr %q", code, stdout, stderr)
+	}
+	if res.File != wav {
+		t.Fatalf("played %q, want the original %q", res.File, wav)
+	}
+	if code, _, _ := run("preview", "builtin:boom", "--wait", "--json"); code != 0 {
+		t.Fatalf("builtin preview: exit %d", code)
+	}
+	played, _ := os.ReadFile(log)
+	if lines := strings.Fields(string(played)); len(lines) != 2 || lines[0] != wav || filepath.Base(lines[1]) != "boom.wav" {
+		t.Fatalf("player calls: %q", played)
+	}
+	code, _, stderr = run("preview", txt, "--json")
+	if code != output.ExitUsage || !strings.Contains(stderr, `"invalid_value"`) {
+		t.Fatalf("unsupported type: exit %d stderr %q", code, stderr)
+	}
+	// Nothing was imported and no config was written.
+	p, err := config.ResolvePaths()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(p.ConfigFile()); !os.IsNotExist(err) {
+		t.Fatalf("preview wrote the config: %v", err)
+	}
+	entries, _ := os.ReadDir(p.SoundsDir())
+	for _, e := range entries {
+		if e.Name() != "builtin" {
+			t.Fatalf("preview imported %s", e.Name())
+		}
+	}
 }

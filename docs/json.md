@@ -35,7 +35,7 @@ New codes may be added; existing ones are never renumbered.
 | `usage` | 2 | Unknown command or flag, wrong number of arguments. |
 | `confirmation_required` | 2 | `install`/`uninstall` without `--yes` or `--dry-run`. |
 | `invalid_key` | 2 | `config` with an unknown key, or `add`/`remove` on a key that isn't a sound list. |
-| `invalid_value` | 2 | `config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound; `config remove` of a sound that isn't in the list. |
+| `invalid_value` | 2 | `config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound (also for `preview`); `config remove` of a sound that isn't in the list. |
 | `unknown_event` | 2 | `play` with an event other than `commit`, `push`, `merge`. |
 | `not_a_repo` | 1 | `doctor --repo <dir>` where the dir isn't in a git repository. |
 | `git_not_found` | 1 | git is not installed or not on PATH. |
@@ -43,7 +43,7 @@ New codes may be added; existing ones are never renumbered.
 | `install_failed` | 1 | `install` could not finish (git config or file write failed). Safe to retry. |
 | `uninstall_failed` | 1 | `uninstall` could not finish. Safe to retry. |
 | `config_invalid` | 1 | The config file can't be parsed. |
-| `sound_not_found` | 1 | `config set/add` with a file that doesn't exist, or `play --sound` naming a sound that isn't in the event's list. |
+| `sound_not_found` | 1 | `config set/add` with a file that doesn't exist, `play --sound` naming a sound that isn't in the event's list, or `preview` of a file that doesn't exist. |
 | `no_sound` | 1 | `play` for an event with no sounds set. |
 | `sound_missing` | 1 | `play`: every sound file for the event is gone. |
 | `no_player` | 1 | No audio player found, or `JINGLE_PLAYER` isn't executable. |
@@ -154,6 +154,22 @@ Both return the same shape. `--dry-run` returns what *would* change and changes 
 | `enabled` | bool | Whether this event would play on a real commit/push/merge (`play` plays even when it wouldn't). |
 | `waited` | bool | Whether `play` waited for the player to finish (`--wait`). |
 
+### `preview`
+
+`jingle preview <builtin:name|file>` plays any sound at the configured volume without adding it to an event, so it can be auditioned first. It changes nothing.
+
+```json
+{"sound": "builtin:boom", "file": "/Users/me/.local/share/jingle/sounds/builtin/boom.wav", "player": {"name": "afplay", "path": "/usr/bin/afplay", "args": [], "volume": true}, "volume": 100, "waited": false}
+```
+
+| Field | Type | Meaning |
+|---|---|---|
+| `sound` | string | The sound as given: `builtin:<name>`, or the file's absolute path. |
+| `file` | string | The file that played. For a built-in, the file jingle rendered it to. |
+| `player` | object | See [player](#player). |
+| `volume` | int | Volume used (0–100). |
+| `waited` | bool | Whether `preview` waited for the player to finish (`--wait`). |
+
 ### `status`, `doctor`
 
 `status` and `doctor` print the same report. `doctor` also checks the repo in the current dir (or `--repo <dir>`), adds `repo`, and exits 1 if any problem has severity `error`. `status` always exits 0.
@@ -218,6 +234,7 @@ Problem codes:
 | `events` | array of string | `commit`, `push`, `merge`. |
 | `config_keys` | array | `{"key", "type" ("bool", "int", "string", "list"), "default", "doc"}`, plus `values` for a string key with a fixed set and `min`/`max` for an int key. |
 | `builtin_sounds` | array | `{"name" ("builtin:chime"), "doc", "default_for" (events)}`. |
+| `sound_types` | array of string | Audio file extensions a sounds list accepts, e.g. `.mp3`. |
 | `exit_codes` | array | `{"code", "meaning"}`, the [exit codes](#exit-codes) table. |
 | `error_codes` | array | `{"code", "exit", "meaning"}`, the [errors](#errors) table. |
 | `problem_codes` | array | `{"code", "severities", "meaning"}`, the problem code table above. |

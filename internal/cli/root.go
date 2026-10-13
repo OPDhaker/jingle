@@ -79,6 +79,7 @@ Exit codes:
 		newUninstallCmd(printer),
 		newConfigCmd(printer),
 		newPlayCmd(printer),
+		newPreviewCmd(printer),
 		newStatusCmd(printer),
 		newDoctorCmd(printer),
 		newVersionCmd(printer),

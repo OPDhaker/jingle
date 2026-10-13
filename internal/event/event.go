@@ -1,6 +1,6 @@
 // Package event plays the sound for a git event. It is the single place that
-// decides whether and what to play, shared by the hook entry point, `jingle
-// play`, and (later) the GUI.
+// decides whether and what to play, shared by the hook entry point and
+// `jingle play` / `jingle preview` (which the GUI runs).
 package event
 
 import (
@@ -8,6 +8,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -19,7 +20,7 @@ import (
 	"github.com/OPDhaker/jingle/internal/player"
 )
 
-// Error codes returned by Play. They double as CLI error codes.
+// Error codes returned by Play and Preview. They double as CLI error codes.
 const (
 	CodeUnknownEvent  = "unknown_event"
 	CodeConfigInvalid = "config_invalid"
@@ -27,6 +28,7 @@ const (
 	CodeNoSound       = "no_sound"
 	CodeSoundMissing  = "sound_missing"
 	CodeSoundNotFound = "sound_not_found"
+	CodeInvalidValue  = "invalid_value"
 	CodeNoPlayer      = "no_player"
 	CodePlayerFailed  = "player_failed"
 	// CodeCooldown: the event played too recently. Hooks only; `jingle play`
@@ -124,13 +126,7 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	// A missing file is skipped as long as another sound can play.
 	var existing, sounds []string
 	for _, e := range entries {
-		s := config.SoundFile(paths, e)
-		if name, ok := builtin.Parse(e); ok {
-			// Rendered on first use; a failure counts as a missing file.
-			if got, err := builtin.Ensure(paths.SoundsDir(), name); err == nil {
-				s = got
-			}
-		}
+		s := soundFile(paths, e)
 		sounds = append(sounds, s)
 		if isFile(s) {
 			existing = append(existing, s)
@@ -151,16 +147,86 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	if !opts.IgnoreCooldown && !takeTurn(paths, event, cooldown, time.Now) {
 		return res, errorf(CodeCooldown, "%s played less than %ds ago", event, cfg.Cooldown)
 	}
-	if opts.Wait {
-		res.Waited = true
-		err = player.Run(p, res.Sound, cfg.Volume)
-	} else {
-		err = player.Start(p, res.Sound, cfg.Volume)
-	}
-	if err != nil {
-		return res, errorf(CodePlayerFailed, "%s failed: %v", p.Name, err)
+	res.Waited = opts.Wait
+	if err := start(p, res.Sound, cfg.Volume, opts.Wait); err != nil {
+		return res, err
 	}
 	return res, nil
+}
+
+// PreviewResult describes what Preview did.
+type PreviewResult struct {
+	// Sound is the sound as given: a "builtin:<name>" entry or a file path.
+	Sound string `json:"sound"`
+	// File is the file that played (for a built-in, its rendered WAV).
+	File   string        `json:"file"`
+	Player player.Player `json:"player"`
+	Volume int           `json:"volume"`
+	Waited bool          `json:"waited"`
+}
+
+// Preview plays a sound that need not be in any event's list, at the
+// configured volume, so it can be auditioned before it is added. It changes
+// nothing: no config, no cooldown. Errors are *Error.
+func Preview(paths config.Paths, sound string, wait bool) (PreviewResult, error) {
+	res := PreviewResult{Sound: sound}
+	cfg, err := config.Load(paths)
+	if err != nil {
+		return res, errorf(CodeConfigInvalid, "%v", err)
+	}
+	if name, ok := builtin.Parse(sound); ok {
+		if !builtin.Exists(name) {
+			return res, errorf(CodeInvalidValue, "unknown built-in sound %q (have: %s)", sound, strings.Join(builtin.Entries(), ", "))
+		}
+	} else {
+		abs, err := filepath.Abs(sound)
+		if err != nil || !isFile(abs) {
+			return res, errorf(CodeSoundNotFound, "sound file not found: %s", sound)
+		}
+		if ext := strings.ToLower(filepath.Ext(abs)); !slices.Contains(config.SoundExts, ext) {
+			return res, errorf(CodeInvalidValue, "unsupported audio format %q (supported: %s)", filepath.Ext(abs), strings.Join(config.SoundExts, " "))
+		}
+		sound = abs
+	}
+	res.File = soundFile(paths, sound)
+	if !isFile(res.File) {
+		return res, errorf(CodeSoundMissing, "sound file not found: %s", res.File)
+	}
+	p, ok := DetectPlayer()
+	if !ok {
+		return res, errorf(CodeNoPlayer, "no audio player found on this machine")
+	}
+	res.Player, res.Volume, res.Waited = p, cfg.Volume, wait
+	if err := start(p, res.File, cfg.Volume, wait); err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+// soundFile is the file to play for a sounds list entry. A built-in is
+// rendered on first use; if that fails, the returned path doesn't exist and
+// counts as a missing file.
+func soundFile(paths config.Paths, entry string) string {
+	if name, ok := builtin.Parse(entry); ok {
+		if got, err := builtin.Ensure(paths.SoundsDir(), name); err == nil {
+			return got
+		}
+	}
+	return config.SoundFile(paths, entry)
+}
+
+// start plays file, detached unless wait is set.
+func start(p player.Player, file string, volume int, wait bool) error {
+	var err error
+	if wait {
+		err = player.Run(p, file, volume)
+	} else {
+		err = player.Start(p, file, volume)
+	}
+	if err != nil {
+		return errorf(CodePlayerFailed, "%s failed: %v", p.Name, err)
+	}
+	return nil
 }
 
 func isFile(p string) bool {

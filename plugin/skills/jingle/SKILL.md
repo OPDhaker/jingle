@@ -52,6 +52,7 @@ Every command is non-interactive, takes `--json`, and is safe to retry (a repeat
 | Play the push sound when the push starts, not when it succeeds | `jingle config set push.when attempt` |
 | Quieter | `jingle config set volume 50` |
 | Allow back-to-back sounds | `jingle config set cooldown 0` |
+| Hear a sound before choosing it | `jingle preview builtin:boom --wait` |
 | See every setting | `jingle config list --json` |
 | Full status (installed? player? git version? problems?) | `jingle status --json` |
 

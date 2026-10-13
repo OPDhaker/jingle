@@ -23,6 +23,7 @@ type schemaDoc struct {
 	Events        []string          `json:"events"`
 	ConfigKeys    []schemaKey       `json:"config_keys"`
 	BuiltinSounds []schemaSound     `json:"builtin_sounds"`
+	SoundTypes    []string          `json:"sound_types"`
 	ExitCodes     []output.ExitCode `json:"exit_codes"`
 	ErrorCodes    []output.Code     `json:"error_codes"`
 	ProblemCodes  []doctor.CodeInfo `json:"problem_codes"`
@@ -105,6 +106,7 @@ func buildSchema(root *cobra.Command) schemaDoc {
 		Commands:      []schemaCommand{},
 		GlobalFlags:   flagsOf(root.PersistentFlags()),
 		Events:        config.Events,
+		SoundTypes:    config.SoundExts,
 		ExitCodes:     output.ExitCodes,
 		ErrorCodes:    output.ErrorCodes,
 		ProblemCodes:  doctor.Codes,

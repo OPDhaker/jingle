@@ -219,6 +219,32 @@
       },
       {
         "examples": [
+          "jingle preview builtin:boom",
+          "jingle preview ~/Music/tag.mp3 --wait",
+          "jingle preview builtin:fanfare --json"
+        ],
+        "flags": [
+          {
+            "default": "false",
+            "name": "wait",
+            "type": "bool",
+            "usage": "wait for playback to finish"
+          }
+        ],
+        "long": "Play a built-in sound or an audio file at the configured volume,\nwithout adding it to an event. Nothing is changed: no config, no cooldown.\nUse \"play\" to hear the sounds an event already has.\n\nBy default the player starts in the background. Use --wait to block until\nplayback ends and see player errors.",
+        "path": "preview",
+        "runnable": true,
+        "short": "Play any sound, to audition it before adding it",
+        "usage": "jingle preview <builtin:name|file>",
+        "valid_args": [
+          "builtin:chime",
+          "builtin:fanfare",
+          "builtin:harmony",
+          "builtin:boom"
+        ]
+      },
+      {
+        "examples": [
           "jingle schema",
           "jingle schema | jq '.config_keys[] | {key, default}'"
         ],
@@ -422,7 +448,7 @@
       {
         "code": "invalid_value",
         "exit": 2,
-        "meaning": "`config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound; `config remove` of a sound that isn't in the list."
+        "meaning": "`config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound (also for `preview`); `config remove` of a sound that isn't in the list."
       },
       {
         "code": "unknown_event",
@@ -462,7 +488,7 @@
       {
         "code": "sound_not_found",
         "exit": 1,
-        "meaning": "`config set/add` with a file that doesn't exist, or `play --sound` naming a sound that isn't in the event's list."
+        "meaning": "`config set/add` with a file that doesn't exist, `play --sound` naming a sound that isn't in the event's list, or `preview` of a file that doesn't exist."
       },
       {
         "code": "no_sound",
@@ -629,6 +655,15 @@
       }
     ],
     "schema_version": 1,
+    "sound_types": [
+      ".mp3",
+      ".wav",
+      ".aiff",
+      ".aif",
+      ".m4a",
+      ".ogg",
+      ".flac"
+    ],
     "version": "<machine>"
   }
 }

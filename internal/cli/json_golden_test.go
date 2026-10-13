@@ -86,6 +86,8 @@ func TestJSONGolden(t *testing.T) {
 		{"uninstall-unchanged", []string{"uninstall", "--yes", "--purge"}},
 		{"schema", []string{"schema"}},
 		{"skill", []string{"skill"}},
+		{"preview", []string{"preview", "builtin:boom"}},
+		{"preview-file", []string{"preview", wav, "--wait"}},
 	}
 	for i, st := range steps {
 		code, stdout, stderr := run(append(st.args, "--json")...)

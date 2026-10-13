@@ -1,0 +1,16 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "file": "$ROOT/src/tag.wav",
+    "player": {
+      "args": [],
+      "name": "JINGLE_PLAYER",
+      "path": "$ROOT/player",
+      "volume": false
+    },
+    "sound": "$ROOT/src/tag.wav",
+    "volume": 100,
+    "waited": true
+  }
+}
