@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "The settings window: core events, hiding itself, and the file/folder picker.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-hide", "dialog:allow-open"]
+  "permissions": ["core:default", "core:window:allow-hide", "core:window:allow-start-dragging", "dialog:allow-open"]
 }

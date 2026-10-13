@@ -131,7 +131,7 @@ function header(snap: Snapshot): HTMLElement {
   const tone = !s.installed ? "off" : !on ? "off" : hasErrors ? "bad" : "ok";
   return h(
     "header",
-    {},
+    { "data-tauri-drag-region": true },
     h("span", { class: "logo" }, icons.logo()),
     h("div", { class: "title" }, h("h1", {}, "Jingle"), h("span", { class: `pill ${tone}` }, snap.headline)),
     s.installed && toggle("Sounds on", s.config.enabled === true, (v) => void run(() => api.configSet("enabled", [String(v)]))),
