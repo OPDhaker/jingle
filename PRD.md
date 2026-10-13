@@ -82,13 +82,28 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 **Result:** a pushed `v*` tag runs GoReleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`). It publishes versionless archives (`jingle_<os>_<arch>.tar.gz`), `checksums.txt`, and `install.sh` to the GitHub release, and a cask to `OPDhaker/homebrew-tap`. The cask clears quarantine (the binary is unsigned) and has no uninstall or zap hook: casks run uninstall hooks on upgrade, and a zap that removed the hooks dir would leave `core.hooksPath` pointing at nothing, silently disabling every repo's own hooks. `install.sh` checks the sha256, installs to `~/.local/bin` without sudo, and does not change git config. `uninstall --purge` also deletes the config and imported sounds, and removes the config/data dirs only when nothing else is in them. `docs/json.md` documents every command's JSON, the error, problem, and exit codes, and the versioning rule; `version --json` reports `schema_version` (1); golden tests (`internal/cli/testdata/json/`) pin every command's output. `scripts/e2e-clean-machine.sh` runs install.sh → install → commit and push play → `uninstall --purge` → gitconfig byte-identical with no files left; it passes on macOS and Ubuntu 24.04, and CI runs it on both. `scripts/linux-player-smoke` runs pw-play, paplay, aplay, and ffplay against null outputs in Docker: each is detected when alone on PATH and exits 0 with jingle's flags at volume 100 and 40. So the Linux command lines are verified, though nothing has been heard on real Linux hardware. The full test suite also passes on Linux. Still open: the first tagged release and the manual brew round trip (`docs/releasing.md`).
 
-## Phase 4: Agent integration
+## Phase 4: Agent integration ✅ done
 
-- Ship an agent skill / `AGENTS.md` snippet: "install and configure `jingle` for this user."
-- `jingle schema` (or `--help --json`): machine-readable description of the commands.
-- Bundled default tag(s), so setup works with zero files supplied.
+- ✅ Ship an agent skill: "install and configure `jingle` for this user."
+- ✅ `jingle schema`: machine-readable description of the commands.
+- ✅ Bundled default tag(s), so setup works with zero files supplied.
 
 **Exit:** a fresh agent session sets up the tool end to end from the skill alone, with no human steps.
+
+**Result:**
+- **Built-in sounds.** jingle has four built-in sounds (`builtin:chime`, `fanfare`, `harmony`, `boom`), synthesized in Go (`internal/builtin`), so there are no audio assets and nothing to license.
+  - They are the defaults: commit plays chime, push plays fanfare, merge plays harmony. `jingle install --yes` alone makes sound, and a fresh `doctor` reports only `not_installed`.
+  - A built-in is rendered on first play to `<data>/sounds/builtin/<name>.wav`, a 16-bit 44.1 kHz WAV that every supported player handles. It is rewritten whenever it doesn't match the binary.
+  - Found along the way: TOML drops nil lists, so a cleared sound list would have loaded back as the default. `Save` now writes `[]`. A legacy `sound` key now replaces the default list instead of joining it.
+- **`jingle schema`** prints JSON built from the live cobra tree and from code tables (`config.KeyInfos`, `output.ErrorCodes`, `doctor.Codes`). The root `--help` error list is generated from the same tables.
+  - `TestCodesDocumented` checks that the codes used in the source, the tables, and `docs/json.md` match row for row. It found `git_failed` (from `doctor --repo`), which had never been documented.
+- **The skill** lives in `plugin/skills/jingle/SKILL.md`. It ships two ways from that one file:
+  - through the plugin marketplace in this repo (`/plugin install jingle --marketplace OPDhaker/jingle`; `claude plugin validate` passes);
+  - embedded in the binary: `jingle skill` prints it, so it always matches the installed version.
+
+  `TestSkillMatchesCLI` checks that every command, flag, config key, and built-in the skill shows actually exists.
+- **Exit check:** passed. A fresh `claude -p` session was given only the plugin, in a sandbox (`XDG_*`, `GIT_CONFIG_GLOBAL`, a logging `JINGLE_PLAYER`), with the prompt "Set up jingle so I hear a sound when I commit and push". It took 9 turns and no human steps. Afterwards doctor was clean, a commit played chime and a push played fanfare, and the real `~/.gitconfig` and jingle config were byte-identical. `scripts/e2e-clean-machine.sh` now asserts that the built-ins play with no `config set`.
+- **Still open:** nobody has listened to the built-ins on Linux hardware. Tuning them by ear is welcome.
 
 ## Phase 5: GUI
 
@@ -103,4 +118,4 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 - Should commits made by agents (e.g. detected by commit author or environment) have their own toggle or sound?
 - How does the tool behave in CI and other headless environments (detect them and stay silent)?
-- Licensing for bundled default sounds.
+- ~~Licensing for bundled default sounds.~~ Resolved: they are synthesized in code (MIT).
