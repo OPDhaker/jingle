@@ -16,6 +16,7 @@ macOS and Linux. (Windows is planned, not supported yet.)
 **Homebrew** (macOS and Linux):
 
 ```sh
+brew trust opdhaker/tap            # once; Homebrew 7 asks you to trust third-party taps
 brew install OPDhaker/tap/jingle
 ```
 
@@ -100,6 +101,7 @@ It is a front end for the CLI and has no logic of its own. Every change runs a `
 **Homebrew** (macOS; also installs the CLI):
 
 ```sh
+brew trust opdhaker/tap            # once, if you haven't already
 brew install --cask OPDhaker/tap/jingle-app
 ```
 

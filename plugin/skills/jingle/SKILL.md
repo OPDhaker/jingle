@@ -12,7 +12,7 @@ Every command is non-interactive, takes `--json`, and is safe to retry (a repeat
 ## Set up
 
 1. **Get the binary.** If `command -v jingle` finds it, skip to step 2. Otherwise use the first of these that works:
-   - Homebrew available (`command -v brew`): `brew install OPDhaker/tap/jingle`
+   - Homebrew available (`command -v brew`): `brew trust opdhaker/tap` (Homebrew 7 and later refuse untrusted third-party taps; on older Homebrew the command doesn't exist and isn't needed), then `brew install OPDhaker/tap/jingle`
    - Otherwise: `curl -fsSL https://raw.githubusercontent.com/OPDhaker/jingle/main/install.sh | sh`. This installs to `~/.local/bin` without sudo. If that dir isn't on `PATH`, call `~/.local/bin/jingle` directly and tell the user to add it to their shell profile.
    - Go 1.25+ available: `go install github.com/OPDhaker/jingle/cmd/jingle@latest`
 

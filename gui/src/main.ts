@@ -116,7 +116,7 @@ function notFoundCopy(snap: Snapshot): { title: string; text: string; commands: 
     return {
       title: "Install the jingle command-line tool",
       text: "This app is a front end for the jingle CLI, which does the actual work. Install it with one of these, then try again:",
-      commands: ["brew install OPDhaker/tap/jingle", INSTALL_SCRIPT],
+      commands: ["brew trust opdhaker/tap\nbrew install OPDhaker/tap/jingle", INSTALL_SCRIPT],
       detail: e?.message,
     };
   }

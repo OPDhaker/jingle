@@ -56,7 +56,7 @@ git push origin v0.1.0
 Then watch the `release` workflow. Afterwards, check:
 
 ```sh
-brew update && brew install OPDhaker/tap/jingle && jingle version
+brew update && brew trust opdhaker/tap && brew install OPDhaker/tap/jingle && jingle version
 brew install --cask OPDhaker/tap/jingle-app && open -a Jingle
 curl -fsSL https://raw.githubusercontent.com/OPDhaker/jingle/main/install.sh | JINGLE_INSTALL_DIR=/tmp/jingle-check sh
 ```
