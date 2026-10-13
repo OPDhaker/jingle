@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/config"
 )
 
@@ -110,4 +111,27 @@ func TestMergeDonePlaysOnlyForMergeCommits(t *testing.T) {
 		t.Fatalf("merge commit: played=%v err=%v", played, err)
 	}
 	waitLines(t, log, 1)
+}
+
+func TestPlayRendersBuiltinSounds(t *testing.T) {
+	p, _ := setup(t)
+	opts := Options{IgnoreCooldown: true, Wait: true}
+	res, err := Play(p, "commit", opts) // default config: builtin:chime
+	want := builtin.File(p.SoundsDir(), "chime")
+	if err != nil || res.Sound != want {
+		t.Fatalf("default commit played %q, %v; want %s", res.Sound, err, want)
+	}
+	if data, _ := os.ReadFile(want); len(data) < 44 || string(data[:4]) != "RIFF" {
+		t.Fatalf("%s is not a WAV file", want)
+	}
+	setSounds(t, p, []string{"builtin:chime", "builtin:boom"})
+	opts.Sound = "boom"
+	if res, err := Play(p, "push", opts); err != nil || res.Sound != builtin.File(p.SoundsDir(), "boom") {
+		t.Fatalf("--sound boom played %q, %v", res.Sound, err)
+	}
+	setSounds(t, p, []string{"builtin:nope"})
+	opts.Sound = ""
+	if _, err := Play(p, "push", opts); code(err) != CodeSoundMissing {
+		t.Fatalf("unknown built-in: %v", err)
+	}
 }

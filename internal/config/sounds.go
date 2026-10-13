@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/fsutil"
 )
 
@@ -69,8 +70,8 @@ func ImportSound(p Paths, event, src string) (dest string, wrote bool, err error
 // RemoveImportedSound deletes path if it is a copy jingle made for event.
 // User files outside the sounds dir are never touched.
 func RemoveImportedSound(p Paths, event, path string) error {
-	if path == "" {
-		return nil
+	if _, ok := builtin.Parse(path); path == "" || ok {
+		return nil // built-ins are rendered files jingle owns, not copies
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(p.SoundsDir(), path)

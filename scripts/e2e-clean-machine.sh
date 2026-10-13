@@ -1,6 +1,7 @@
 #!/bin/sh
 # End-to-end check of the release, as a new user would see it: install.sh
-# from a goreleaser dist/ → jingle install → commit and push play → uninstall
+# from a goreleaser dist/ → jingle install → commit and push play the built-in
+# sounds, with no files supplied → uninstall
 # --purge → gitconfig byte-identical and no jingle files left. Uses jingle's
 # default paths under a temp HOME, never the real one.
 #
@@ -35,7 +36,6 @@ log="$work/played.log"
 printf '#!/bin/sh\nprintf "%%s\\n" "$1" >> "%s"\n' "$log" >"$work/player"
 chmod +x "$work/player"
 export JINGLE_PLAYER="$work/player"
-printf 'RIFF fake' >"$work/tag.wav"
 
 # played <n>: wait up to 5 s for the log to have n lines.
 played() {
@@ -55,21 +55,23 @@ jingle version
 
 step "jingle install"
 jingle install --yes >/dev/null
-jingle config set commit.sounds "$work/tag.wav" >/dev/null
-jingle config set push.sounds "$work/tag.wav" >/dev/null
-[ -f "$HOME/.config/jingle/config.toml" ] || fail "config not at the default path"
+jingle config list --json | grep -q "\"$HOME/.config/jingle/config.toml\"" || fail "config not at the default path"
 [ -d "$HOME/.local/share/jingle/hooks" ] || fail "hooks not at the default path"
+# No sounds are configured: the built-in defaults must play.
+sounds="$HOME/.local/share/jingle/sounds/builtin"
 
 step "commit plays"
 git init -q "$work/repo"
 git -C "$work/repo" commit -q --allow-empty -m one
 played 1
+[ "$(sed -n 1p "$log")" = "$sounds/chime.wav" ] || fail "commit played $(sed -n 1p "$log"), want the built-in chime"
 
 step "push plays"
 git init -q --bare "$work/remote.git"
 git -C "$work/repo" remote add origin "$work/remote.git"
 git -C "$work/repo" push -q -u origin main
 played 2
+[ "$(sed -n 2p "$log")" = "$sounds/fanfare.wav" ] || fail "push played $(sed -n 2p "$log"), want the built-in fanfare"
 
 step "doctor"
 jingle doctor --repo "$work/repo" >/dev/null || fail "doctor reported problems: $(jingle doctor --repo "$work/repo")"

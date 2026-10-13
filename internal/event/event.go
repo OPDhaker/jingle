@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/gitcfg"
 	"github.com/OPDhaker/jingle/internal/player"
@@ -108,9 +109,9 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 	if !res.Enabled && !opts.IgnoreEnabled {
 		return res, errorf(CodeDisabled, "%s sound is turned off", event)
 	}
-	sounds := cfg.SoundPaths(paths, event)
-	res.Sounds = len(sounds)
-	if len(sounds) == 0 {
+	entries := slices.Clone(cfg.Event(event).Sounds)
+	res.Sounds = len(entries)
+	if len(entries) == 0 {
 		return res, errorf(CodeNoSound, "no sound set for %s; run: jingle config set %s.sounds <file>", event, event)
 	}
 	if opts.Sound != "" {
@@ -118,10 +119,23 @@ func Play(paths config.Paths, event string, opts Options) (Result, error) {
 		if !ok {
 			return res, errorf(CodeSoundNotFound, "%q is not one of the %s sounds; see: jingle config get %s.sounds", opts.Sound, event, event)
 		}
-		sounds = []string{config.SoundFile(paths, entry)}
+		entries = []string{entry}
 	}
 	// A missing file is skipped as long as another sound can play.
-	existing := slices.DeleteFunc(slices.Clone(sounds), func(s string) bool { return !isFile(s) })
+	var existing, sounds []string
+	for _, e := range entries {
+		s := config.SoundFile(paths, e)
+		if name, ok := builtin.Parse(e); ok {
+			// Rendered on first use; a failure counts as a missing file.
+			if got, err := builtin.Ensure(paths.SoundsDir(), name); err == nil {
+				s = got
+			}
+		}
+		sounds = append(sounds, s)
+		if isFile(s) {
+			existing = append(existing, s)
+		}
+	}
 	if len(existing) == 0 {
 		return res, errorf(CodeSoundMissing, "sound file for %s not found: %s", event, strings.Join(sounds, ", "))
 	}

@@ -16,7 +16,9 @@
       "cooldown": 3,
       "enabled": true,
       "merge.enabled": false,
-      "merge.sounds": [],
+      "merge.sounds": [
+        "builtin:harmony"
+      ],
       "push.enabled": true,
       "push.sounds": [],
       "push.when": "success",

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -49,22 +50,21 @@ or git push. Install it once and it works in every repo on this machine.
 
 Typical setup:
   jingle install --yes
-  jingle config set commit.sounds ~/Music/tag.mp3
-  jingle play commit
+  jingle play commit --wait      # built-in sounds play with no files supplied
+  jingle config set commit.sounds ~/Music/tag.mp3   # optional: your own tag
   jingle doctor
 
 Every command supports --json for machine-readable output. Errors go to
 stderr; with --json as {"error": {"code": "...", "message": "..."}}.
+"jingle schema" describes every command, flag, config key, and code as JSON;
+"jingle skill" prints step-by-step setup instructions for AI agents.
 
 Exit codes:
   0  requested state reached (including "unchanged")
   1  error
   2  bad command, flag, argument, or missing --yes
 
-Error codes: usage, confirmation_required, invalid_key, invalid_value,
-unknown_event, git_not_found, install_failed, uninstall_failed,
-config_invalid, sound_not_found, no_sound, sound_missing, no_player,
-player_failed, paths_unavailable, io_error, problems_found, not_a_repo`,
+` + wrap("Error codes: "+strings.Join(errorCodeNames(), ", "), 76),
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
@@ -82,7 +82,35 @@ player_failed, paths_unavailable, io_error, problems_found, not_a_repo`,
 		newStatusCmd(printer),
 		newDoctorCmd(printer),
 		newVersionCmd(printer),
+		newSchemaCmd(),
+		newSkillCmd(printer),
 		newHookEventCmd(),
 	)
 	return root
+}
+
+func errorCodeNames() []string {
+	names := make([]string, len(output.ErrorCodes))
+	for i, c := range output.ErrorCodes {
+		names[i] = c.Code
+	}
+	return names
+}
+
+// wrap breaks s into lines of at most width runes, at spaces.
+func wrap(s string, width int) string {
+	var b strings.Builder
+	n := 0
+	for i, w := range strings.Fields(s) {
+		if i > 0 && n+1+len(w) > width {
+			b.WriteByte('\n')
+			n = 0
+		} else if i > 0 {
+			b.WriteByte(' ')
+			n++
+		}
+		b.WriteString(w)
+		n += len(w)
+	}
+	return b.String()
 }

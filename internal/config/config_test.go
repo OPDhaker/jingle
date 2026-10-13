@@ -2,6 +2,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/OPDhaker/jingle/internal/builtin"
 )
 
 func testPaths(t *testing.T) Paths {
@@ -180,8 +183,55 @@ func TestSoundPathsRelative(t *testing.T) {
 	if got := cfg.SoundPaths(p, "push"); !slices.Equal(got, want) {
 		t.Fatalf("got %v", got)
 	}
+	if got := cfg.SoundPaths(p, "commit"); !slices.Equal(got, []string{filepath.Join(p.SoundsDir(), "builtin", "chime.wav")}) {
+		t.Fatalf("default commit sound resolved to %v", got)
+	}
+	cfg.Commit.Sounds = nil
 	if got := cfg.SoundPaths(p, "commit"); len(got) != 0 {
 		t.Fatalf("unset sounds resolved to %v", got)
+	}
+}
+
+func TestClearedSoundsStayCleared(t *testing.T) {
+	p := testPaths(t)
+	cfg := Default()
+	cfg.Commit.SetSounds(nil)
+	if err := Save(p, cfg); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load(p)
+	if err != nil || len(got.Commit.Sounds) != 0 || len(got.Push.Sounds) != 1 {
+		t.Fatalf("after clearing commit.sounds: commit %v, push %v, %v", got.Commit.Sounds, got.Push.Sounds, err)
+	}
+}
+
+func TestDefaultSoundsAreBuiltins(t *testing.T) {
+	cfg := Default()
+	for _, ev := range Events {
+		sounds := cfg.Event(ev).Sounds
+		if len(sounds) != 1 {
+			t.Fatalf("%s: default sounds %v", ev, sounds)
+		}
+		if name, ok := builtin.Parse(sounds[0]); !ok || !builtin.Exists(name) {
+			t.Fatalf("%s: default %q is not a built-in sound", ev, sounds[0])
+		}
+	}
+}
+
+func TestKeyInfos(t *testing.T) {
+	cfg := Default()
+	for _, k := range KeyInfos {
+		v, err := cfg.Get(k.Key)
+		if err != nil {
+			t.Fatalf("%s: %v", k.Key, err)
+		}
+		want := map[string]string{"bool": "bool", "int": "int", "string": "string", "list": "[]string"}[k.Type]
+		if got := fmt.Sprintf("%T", v); got != want || k.Doc == "" {
+			t.Errorf("%s: type %s, value is %s, doc %q", k.Key, k.Type, got, k.Doc)
+		}
+		if (k.Min == nil) != (k.Type != "int") || (len(k.Values) > 0) != (k.Key == "push.when") {
+			t.Errorf("%s: bounds/values don't fit type %s", k.Key, k.Type)
+		}
 	}
 }
 
@@ -204,6 +254,21 @@ func TestLegacySoundMigrates(t *testing.T) {
 	}
 }
 
+func TestLegacySoundReplacesDefault(t *testing.T) {
+	p := testPaths(t)
+	body := "version = 1\n[commit]\nsound = \"/a.wav\"\n[push]\nsound = \"\"\n"
+	if err := os.WriteFile(p.ConfigFile(), []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(p)
+	if err != nil || !slices.Equal(cfg.Commit.Sounds, []string{"/a.wav"}) || len(cfg.Push.Sounds) != 0 {
+		t.Fatalf("commit %v, push %v, %v; want [/a.wav] and []", cfg.Commit.Sounds, cfg.Push.Sounds, err)
+	}
+	if !slices.Equal(cfg.Merge.Sounds, Default().Merge.Sounds) {
+		t.Fatalf("merge (no legacy key) %v, want the default", cfg.Merge.Sounds)
+	}
+}
+
 func TestSoundList(t *testing.T) {
 	cfg := Default()
 	ev := &cfg.Commit
@@ -222,6 +287,7 @@ func TestSoundList(t *testing.T) {
 	if v, _ := cfg.Get("commit.sounds"); !reflect.DeepEqual(v, []string{"/a.wav", "/c.wav"}) {
 		t.Fatalf("Get = %#v", v)
 	}
+	cfg.Push.Sounds = nil
 	if v, _ := cfg.Get("push.sounds"); v == nil || len(v.([]string)) != 0 {
 		t.Fatalf("empty list Get = %#v, want []string{}", v)
 	}
@@ -233,8 +299,10 @@ func TestSoundList(t *testing.T) {
 func TestMatchSound(t *testing.T) {
 	p := testPaths(t)
 	cfg := Default()
-	cfg.Commit.Sounds = []string{filepath.Join(p.SoundsDir(), "commit-tag.wav"), filepath.Join(p.SoundsDir(), "commit-tag-2.wav")}
+	cfg.Commit.Sounds = []string{filepath.Join(p.SoundsDir(), "commit-tag.wav"), filepath.Join(p.SoundsDir(), "commit-tag-2.wav"), "builtin:boom"}
 	for name, want := range map[string]string{
+		"builtin:boom":              "builtin:boom",
+		"boom":                      "builtin:boom",
 		cfg.Commit.Sounds[1]:        cfg.Commit.Sounds[1],
 		"commit-tag-2.wav":          cfg.Commit.Sounds[1],
 		"tag.wav":                   cfg.Commit.Sounds[0],
@@ -245,7 +313,7 @@ func TestMatchSound(t *testing.T) {
 			t.Errorf("MatchSound(%q) = %q, %v; want %q", name, got, ok, want)
 		}
 	}
-	for _, name := range []string{"", "other.wav", "tag-2.wav.bak"} {
+	for _, name := range []string{"", "other.wav", "tag-2.wav.bak", "chime", "builtin:chime"} {
 		if got, ok := cfg.MatchSound(p, "commit", name); ok {
 			t.Errorf("MatchSound(%q) matched %q", name, got)
 		}

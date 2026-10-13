@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/event"
 	"github.com/OPDhaker/jingle/internal/gitcfg"
@@ -155,15 +156,20 @@ func (r *Report) checkConfig(env hooks.Env) {
 		if !cfg.Enabled || !cfg.Event(ev).Enabled {
 			continue
 		}
-		sounds := cfg.SoundPaths(env.Paths, ev)
+		sounds := cfg.Event(ev).Sounds
 		if len(sounds) == 0 {
 			r.add(Error, "no_sound", "no sound set for "+ev, "jingle config set "+ev+".sounds <file>")
 			continue
 		}
 		var missing []string
 		for _, s := range sounds {
-			if !isFile(s) {
-				missing = append(missing, s)
+			// A built-in is rendered when it plays, so it only has to exist.
+			if name, ok := builtin.Parse(s); ok {
+				if !builtin.Exists(name) {
+					missing = append(missing, s)
+				}
+			} else if f := config.SoundFile(env.Paths, s); !isFile(f) {
+				missing = append(missing, f)
 			}
 		}
 		switch {

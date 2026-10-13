@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "jingle",
+  "description": "jingle: play a producer tag when you git commit or push.",
+  "owner": {
+    "name": "Om Pratap Dhaker",
+    "url": "https://github.com/OPDhaker"
+  },
+  "plugins": [
+    {
+      "name": "jingle",
+      "description": "Skill that installs, configures, checks, and removes the jingle CLI for you.",
+      "source": "./plugin",
+      "category": "productivity"
+    }
+  ]
+}

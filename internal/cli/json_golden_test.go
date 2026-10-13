@@ -71,7 +71,7 @@ func TestJSONGolden(t *testing.T) {
 		{"install-unchanged", []string{"install", "--yes"}},
 		{"config-set-sounds", []string{"config", "set", "commit.sounds", wav}},
 		{"config-add-sounds", []string{"config", "add", "push.sounds", wav}},
-		{"config-remove-sounds", []string{"config", "remove", "push.sounds", "push-tag.wav"}},
+		{"config-remove-sounds", []string{"config", "remove", "push.sounds", "push-tag.wav", "fanfare"}},
 		{"config-set-unchanged", []string{"config", "set", "volume", "100"}},
 		{"config-get", []string{"config", "get", "push.when"}},
 		{"config-list", []string{"config", "list"}},
@@ -84,6 +84,8 @@ func TestJSONGolden(t *testing.T) {
 		{"uninstall-purge-dry-run", []string{"uninstall", "--yes", "--purge", "--dry-run"}},
 		{"uninstall-purge", []string{"uninstall", "--yes", "--purge"}},
 		{"uninstall-unchanged", []string{"uninstall", "--yes", "--purge"}},
+		{"schema", []string{"schema"}},
+		{"skill", []string{"skill"}},
 	}
 	for i, st := range steps {
 		code, stdout, stderr := run(append(st.args, "--json")...)
@@ -147,6 +149,8 @@ func scrub(v any, root string) any {
 				v[k] = map[string]any{"path": "<machine>", "version": "<machine>"}
 			case machineKeys[k] && isString(x):
 				v[k] = "<machine>"
+			case k == "markdown" && isString(x):
+				v[k] = "<SKILL.md>" // the skill's prose is not part of the contract
 			default:
 				v[k] = scrub(x, root)
 			}

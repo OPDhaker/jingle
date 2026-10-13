@@ -35,15 +35,16 @@ New codes may be added; existing ones are never renumbered.
 | `usage` | 2 | Unknown command or flag, wrong number of arguments. |
 | `confirmation_required` | 2 | `install`/`uninstall` without `--yes` or `--dry-run`. |
 | `invalid_key` | 2 | `config` with an unknown key, or `add`/`remove` on a key that isn't a sound list. |
-| `invalid_value` | 2 | `config set` with a value of the wrong type or out of range, or an audio file of an unsupported type; `config remove` of a sound that isn't in the list. |
+| `invalid_value` | 2 | `config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound; `config remove` of a sound that isn't in the list. |
 | `unknown_event` | 2 | `play` with an event other than `commit`, `push`, `merge`. |
 | `not_a_repo` | 1 | `doctor --repo <dir>` where the dir isn't in a git repository. |
 | `git_not_found` | 1 | git is not installed or not on PATH. |
+| `git_failed` | 1 | `doctor`: a git command failed unexpectedly while checking the repo. |
 | `install_failed` | 1 | `install` could not finish (git config or file write failed). Safe to retry. |
 | `uninstall_failed` | 1 | `uninstall` could not finish. Safe to retry. |
 | `config_invalid` | 1 | The config file can't be parsed. |
-| `sound_not_found` | 1 | `config set/add` with a file that doesn't exist. |
-| `no_sound` | 1 | `play` for an event with no sounds set, or `--sound` naming one that isn't in the list. |
+| `sound_not_found` | 1 | `config set/add` with a file that doesn't exist, or `play --sound` naming a sound that isn't in the event's list. |
+| `no_sound` | 1 | `play` for an event with no sounds set. |
 | `sound_missing` | 1 | `play`: every sound file for the event is gone. |
 | `no_player` | 1 | No audio player found, or `JINGLE_PLAYER` isn't executable. |
 | `player_failed` | 1 | The player could not be started (or, with `play --wait`, exited non-zero). |
@@ -114,13 +115,13 @@ Both return the same shape. `--dry-run` returns what *would* change and changes 
 | Field | Type | Meaning |
 |---|---|---|
 | `key` | string | The config key. |
-| `value` | bool \| int \| string \| array of string | The value after the command, typed by key (see below). Sound lists hold the paths of jingle's own copies. |
+| `value` | bool \| int \| string \| array of string | The value after the command, typed by key (see below). A sound list entry is either the absolute path of jingle's own copy of a file, or `builtin:<name>` for a [built-in sound](#built-in-sounds). |
 | `changed` | bool | `false` when the value was already that way. Only present for `set`/`add`/`remove`. |
 
 ### `config list`
 
 ```json
-{"path": "/Users/me/.config/jingle/config.toml", "values": {"enabled": true, "cooldown": 3, "volume": 100, "commit.enabled": true, "commit.sounds": [], "push.enabled": true, "push.sounds": [], "push.when": "success", "merge.enabled": false, "merge.sounds": []}}
+{"path": "/Users/me/.config/jingle/config.toml", "values": {"enabled": true, "cooldown": 3, "volume": 100, "commit.enabled": true, "commit.sounds": ["builtin:chime"], "push.enabled": true, "push.sounds": ["builtin:fanfare"], "push.when": "success", "merge.enabled": false, "merge.sounds": ["builtin:harmony"]}}
 ```
 
 `values` has every key, including defaults:
@@ -132,7 +133,9 @@ Both return the same shape. `--dry-run` returns what *would* change and changes 
 | `volume` | int (0–100) | `100` |
 | `commit.enabled`, `push.enabled` | bool | `true` |
 | `merge.enabled` | bool | `false` |
-| `commit.sounds`, `push.sounds`, `merge.sounds` | array of string | `[]` |
+| `commit.sounds` | array of string | `["builtin:chime"]` |
+| `push.sounds` | array of string | `["builtin:fanfare"]` |
+| `merge.sounds` | array of string | `["builtin:harmony"]` |
 | `push.when` | string: `success` \| `attempt` | `success` |
 
 ### `play`
@@ -144,7 +147,7 @@ Both return the same shape. `--dry-run` returns what *would* change and changes 
 | Field | Type | Meaning |
 |---|---|---|
 | `event` | string | The event played. |
-| `sound` | string | The file that played (picked at random from the event's sounds that exist). |
+| `sound` | string | The file that played (picked at random from the event's sounds that exist). For a built-in, the file jingle rendered it to (`<data dir>/sounds/builtin/<name>.wav`). |
 | `sounds` | int | How many sounds the event has. |
 | `player` | object | See [player](#player). |
 | `volume` | int | Volume used (0–100). |
@@ -190,12 +193,47 @@ Problem codes:
 | `jingle_binary_missing` | error | The binary the hooks call is gone and `jingle` isn't on PATH. |
 | `config_invalid` | error | The config file can't be parsed. |
 | `no_sound` | error | An enabled event has no sounds. |
-| `sound_missing` | error / warning | Every sound file for an event is gone (error), or only some of them (warning). |
+| `sound_missing` | error / warning | Every sound file for an event is gone, or names an unknown built-in (error), or only some of them are (warning). |
 | `no_player` | error | No audio player found, or `JINGLE_PLAYER` is bad. |
 | `volume_unsupported` | warning | `volume` < 100 but the player can't change the volume. |
 | `git_not_found` | error | git isn't installed. |
 | `git_too_old` | warning | git < 2.28: push plays on attempt, not on success. |
 | `git_failed` | error | A git command failed unexpectedly. |
+
+### `schema`
+
+`jingle schema` always prints JSON, with or without `--json`. It describes the CLI so an agent never has to parse `--help`. It is built from the same tables the commands use, so it can't drift from them.
+
+| Field | Type | Meaning |
+|---|---|---|
+| `schema_version`, `version` | int, string | As in `version`. |
+| `commands` | array | Every public command, flattened (`config set` is one entry). Hidden commands are left out. |
+| `commands[].path` | string | The command without `jingle`, e.g. `config set`. |
+| `commands[].usage` | string | E.g. `jingle config set <key> <value>...`. |
+| `commands[].short`, `.long` | string | The `--help` text. |
+| `commands[].runnable` | bool | `false` for a command that only groups subcommands (`config`). |
+| `commands[].examples` | array of string | Real invocations from `--help`. |
+| `commands[].valid_args` | array of string | Accepted first arguments, when the set is fixed (events, keys). |
+| `commands[].flags`, `global_flags` | array | `{"name", "shorthand" (omitted if none), "type" ("bool", "string", ...), "default", "usage"}`. `global_flags` work on every command (`--json`). |
+| `events` | array of string | `commit`, `push`, `merge`. |
+| `config_keys` | array | `{"key", "type" ("bool", "int", "string", "list"), "default", "doc"}`, plus `values` for a string key with a fixed set and `min`/`max` for an int key. |
+| `builtin_sounds` | array | `{"name" ("builtin:chime"), "doc", "default_for" (events)}`. |
+| `exit_codes` | array | `{"code", "meaning"}`, the [exit codes](#exit-codes) table. |
+| `error_codes` | array | `{"code", "exit", "meaning"}`, the [errors](#errors) table. |
+| `problem_codes` | array | `{"code", "severities", "meaning"}`, the problem code table above. |
+| `env` | array | `{"name", "meaning"}` for the environment variables jingle reads. |
+
+### `skill`
+
+```json
+{"skill": "jingle", "markdown": "---\nname: jingle\n..."}
+```
+
+`markdown` is the agent skill (`plugin/skills/jingle/SKILL.md`, frontmatter included), exactly as plain `jingle skill` prints it. Its wording is not part of this contract.
+
+### Built-in sounds
+
+A sounds list entry `builtin:<name>` plays a sound built into the binary; no file is needed. `jingle schema` lists them under `builtin_sounds`: `builtin:chime` (commit default), `builtin:fanfare` (push default), `builtin:harmony` (merge default), and `builtin:boom`. The first time one plays, jingle renders it to `<data dir>/sounds/builtin/<name>.wav`. That file is jingle's to manage: it gets rewritten whenever it doesn't match the binary, and `uninstall --purge` removes it.
 
 ### Player
 
@@ -212,4 +250,4 @@ Problem codes:
 
 ## Schema history
 
-- **1**: first published version (v0.1.0).
+- **1**: first published version (v0.1.0). Includes `schema`, `skill`, and the built-in sound defaults.

@@ -624,7 +624,7 @@ func TestDoctorReportsAndExitCodes(t *testing.T) {
 	if code != 1 || !strings.Contains(stderr, "problems_found") {
 		t.Fatalf("fresh doctor: exit %d, stderr %q", code, stderr)
 	}
-	want := []string{"not_installed", "no_sound", "no_sound"}
+	want := []string{"not_installed"} // the built-in sounds need no setup
 	if got := r.codes(); strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("fresh doctor problems %v, want %v", got, want)
 	}
@@ -818,6 +818,31 @@ func TestUninstallPurgeLeavesNothing(t *testing.T) {
 	}
 	if res := s.mustJingle("uninstall", "--yes", "--purge"); res["status"] != "unchanged" {
 		t.Fatalf("second purge status %v", res["status"])
+	}
+}
+
+func TestBuiltinSoundsPlayWithNoSetup(t *testing.T) {
+	s := newSandbox(t)
+	s.mustJingle("install", "--yes")
+	if r, stderr, code := s.doctor(s.root, nil, "doctor"); code != 0 || len(r.Problems) != 0 {
+		t.Fatalf("doctor right after install: exit %d, problems %v, stderr %q", code, r.codes(), stderr)
+	}
+	_, repo := s.pushSetup()
+	s.mustGit(repo, "commit", "-q", "--allow-empty", "-m", "two")
+	builtinDir := filepath.Join(s.jingleDir, "sounds", "builtin")
+	if got := s.played(1); len(got) != 1 || got[0] != filepath.Join(builtinDir, "chime.wav") {
+		t.Fatalf("commit played %v, want the built-in chime", got)
+	}
+	s.mustGit(repo, "push", "-q", "origin", "main")
+	if got := s.played(2); len(got) != 2 || got[1] != filepath.Join(builtinDir, "fanfare.wav") {
+		t.Fatalf("push played %v, want the built-in fanfare", got)
+	}
+	if data, err := os.ReadFile(filepath.Join(builtinDir, "chime.wav")); err != nil || string(data[:4]) != "RIFF" {
+		t.Fatalf("chime.wav: %v", err)
+	}
+	s.mustJingle("uninstall", "--yes", "--purge")
+	if _, err := os.Stat(s.jingleDir); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("purge left %s behind (%v)", s.jingleDir, err)
 	}
 }
 

@@ -1,0 +1,634 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "builtin_sounds": [
+      {
+        "default_for": [
+          "commit"
+        ],
+        "doc": "two-note rising bell",
+        "name": "builtin:chime"
+      },
+      {
+        "default_for": [
+          "push"
+        ],
+        "doc": "quick rising brass arpeggio",
+        "name": "builtin:fanfare"
+      },
+      {
+        "default_for": [
+          "merge"
+        ],
+        "doc": "two voices resolving to a chord",
+        "name": "builtin:harmony"
+      },
+      {
+        "default_for": [],
+        "doc": "snare hit into an 808 drop",
+        "name": "builtin:boom"
+      }
+    ],
+    "commands": [
+      {
+        "examples": [
+          "jingle config list --json",
+          "jingle config get commit.sounds",
+          "jingle config set commit.sounds ~/Music/tag.mp3",
+          "jingle config set push.sounds builtin:boom",
+          "jingle config add commit.sounds ~/Music/tag2.mp3 ~/Music/tag3.wav",
+          "jingle config remove commit.sounds tag2.mp3",
+          "jingle config set push.enabled false",
+          "jingle config set push.when attempt",
+          "jingle config set cooldown 0",
+          "jingle config set volume 60"
+        ],
+        "flags": [],
+        "long": "Read and change jingle's settings. Changes are validated and take effect immediately.\n\nKeys:\n  enabled          true|false  master switch\n  cooldown         <seconds>   quiet time after a sound, per event, so a\n                               burst of commits plays once (default 3, 0 off)\n  volume           0-100       playback volume (default 100); needs afplay,\n                               pw-play, paplay, or ffplay (not aplay or\n                               JINGLE_PLAYER)\n  commit.enabled   true|false  play on git commit\n  commit.sounds    <file>...   sounds for commits; one is picked at random\n  push.enabled     true|false  play on git push\n  push.sounds      <file>...   sounds for pushes; one is picked at random\n  push.when        success|attempt\n                               success (default): play once the push went\n                               through; attempt: play when pre-push passes\n  merge.enabled    true|false  play when a merge makes a merge commit (default\n                               off; fast-forwards and squashes stay quiet)\n  merge.sounds     <file>...   sounds for merges; one is picked at random\n\nBooleans also accept on/off. Sound files (mp3 wav aiff aif m4a ogg flac) are\ncopied into jingle's data dir, so moving the original later is fine.\n\nBuilt-in sounds need no file; use them by name in any sounds list:\n  builtin:chime    two-note rising bell (commit default)\n  builtin:fanfare  quick rising brass arpeggio (push default)\n  builtin:harmony  two voices resolving to a chord (merge default)\n  builtin:boom     snare hit into an 808 drop\n\n\"config set <event>.sounds\" replaces the whole list (\"\" clears it);\n\"config add\" and \"config remove\" change one entry at a time.\n\npush.when success needs git 2.28+. With older git, and for pushes to a URL\nrather than a named remote (no remote-tracking ref moves), push plays on\nattempt. A merge that stops on a conflict plays the commit sound when you\ncommit the resolution.",
+        "path": "config",
+        "runnable": false,
+        "short": "Read and change settings",
+        "usage": "jingle config",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle config add commit.sounds ~/Music/tag2.mp3",
+          "jingle config add push.sounds ./a.wav ./b.wav --json"
+        ],
+        "flags": [],
+        "long": "Add one or more sound files to an event's list. Each sound is copied\ninto jingle's data dir; on every commit or push one sound from the list is\npicked at random. Adding a sound that is already in the list reports\nchanged=false.",
+        "path": "config add",
+        "runnable": true,
+        "short": "Add sounds to an event's list",
+        "usage": "jingle config add <event>.sounds <file>...",
+        "valid_args": [
+          "commit.sounds",
+          "push.sounds",
+          "merge.sounds"
+        ]
+      },
+      {
+        "examples": [
+          "jingle config get enabled",
+          "jingle config get push.sounds --json"
+        ],
+        "flags": [],
+        "long": "Print one setting.\n\nKeys:\n  enabled          true|false  master switch\n  cooldown         <seconds>   quiet time after a sound, per event, so a\n                               burst of commits plays once (default 3, 0 off)\n  volume           0-100       playback volume (default 100); needs afplay,\n                               pw-play, paplay, or ffplay (not aplay or\n                               JINGLE_PLAYER)\n  commit.enabled   true|false  play on git commit\n  commit.sounds    <file>...   sounds for commits; one is picked at random\n  push.enabled     true|false  play on git push\n  push.sounds      <file>...   sounds for pushes; one is picked at random\n  push.when        success|attempt\n                               success (default): play once the push went\n                               through; attempt: play when pre-push passes\n  merge.enabled    true|false  play when a merge makes a merge commit (default\n                               off; fast-forwards and squashes stay quiet)\n  merge.sounds     <file>...   sounds for merges; one is picked at random\n\nBooleans also accept on/off. Sound files (mp3 wav aiff aif m4a ogg flac) are\ncopied into jingle's data dir, so moving the original later is fine.\n\nBuilt-in sounds need no file; use them by name in any sounds list:\n  builtin:chime    two-note rising bell (commit default)\n  builtin:fanfare  quick rising brass arpeggio (push default)\n  builtin:harmony  two voices resolving to a chord (merge default)\n  builtin:boom     snare hit into an 808 drop\n\n\"config set <event>.sounds\" replaces the whole list (\"\" clears it);\n\"config add\" and \"config remove\" change one entry at a time.\n\npush.when success needs git 2.28+. With older git, and for pushes to a URL\nrather than a named remote (no remote-tracking ref moves), push plays on\nattempt. A merge that stops on a conflict plays the commit sound when you\ncommit the resolution.",
+        "path": "config get",
+        "runnable": true,
+        "short": "Print one setting",
+        "usage": "jingle config get <key>",
+        "valid_args": [
+          "enabled",
+          "cooldown",
+          "volume",
+          "commit.enabled",
+          "commit.sounds",
+          "push.enabled",
+          "push.sounds",
+          "push.when",
+          "merge.enabled",
+          "merge.sounds"
+        ]
+      },
+      {
+        "examples": [
+          "jingle config list",
+          "jingle config list --json"
+        ],
+        "flags": [],
+        "long": "",
+        "path": "config list",
+        "runnable": true,
+        "short": "Show every setting",
+        "usage": "jingle config list",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle config remove commit.sounds tag2.mp3",
+          "jingle config remove push.sounds ~/Music/a.wav --json"
+        ],
+        "flags": [],
+        "long": "Remove one or more sounds from an event's list. Name a sound by its entry\n(as \"config get\" prints it), by the original file, or by its file name.\njingle's copy is deleted; your original file is never touched. Naming a\nsound that is not in the list is an error (invalid_value), and nothing\nchanges.",
+        "path": "config remove",
+        "runnable": true,
+        "short": "Remove sounds from an event's list",
+        "usage": "jingle config remove <event>.sounds <file|name>...",
+        "valid_args": [
+          "commit.sounds",
+          "push.sounds",
+          "merge.sounds"
+        ]
+      },
+      {
+        "examples": [
+          "jingle config set enabled off",
+          "jingle config set commit.sounds ./tags/commit.wav --json",
+          "jingle config set push.sounds ~/Music/a.mp3 ~/Music/b.mp3",
+          "jingle config set push.sounds \"\""
+        ],
+        "flags": [],
+        "long": "Change one setting. Setting a value it already has reports changed=false.\nA sounds key takes one or more files and replaces the whole list.\n\nKeys:\n  enabled          true|false  master switch\n  cooldown         <seconds>   quiet time after a sound, per event, so a\n                               burst of commits plays once (default 3, 0 off)\n  volume           0-100       playback volume (default 100); needs afplay,\n                               pw-play, paplay, or ffplay (not aplay or\n                               JINGLE_PLAYER)\n  commit.enabled   true|false  play on git commit\n  commit.sounds    <file>...   sounds for commits; one is picked at random\n  push.enabled     true|false  play on git push\n  push.sounds      <file>...   sounds for pushes; one is picked at random\n  push.when        success|attempt\n                               success (default): play once the push went\n                               through; attempt: play when pre-push passes\n  merge.enabled    true|false  play when a merge makes a merge commit (default\n                               off; fast-forwards and squashes stay quiet)\n  merge.sounds     <file>...   sounds for merges; one is picked at random\n\nBooleans also accept on/off. Sound files (mp3 wav aiff aif m4a ogg flac) are\ncopied into jingle's data dir, so moving the original later is fine.\n\nBuilt-in sounds need no file; use them by name in any sounds list:\n  builtin:chime    two-note rising bell (commit default)\n  builtin:fanfare  quick rising brass arpeggio (push default)\n  builtin:harmony  two voices resolving to a chord (merge default)\n  builtin:boom     snare hit into an 808 drop\n\n\"config set <event>.sounds\" replaces the whole list (\"\" clears it);\n\"config add\" and \"config remove\" change one entry at a time.\n\npush.when success needs git 2.28+. With older git, and for pushes to a URL\nrather than a named remote (no remote-tracking ref moves), push plays on\nattempt. A merge that stops on a conflict plays the commit sound when you\ncommit the resolution.",
+        "path": "config set",
+        "runnable": true,
+        "short": "Change one setting",
+        "usage": "jingle config set <key> <value>...",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle doctor",
+          "jingle doctor --json",
+          "jingle doctor --repo ~/code/app --json"
+        ],
+        "flags": [
+          {
+            "default": "",
+            "name": "repo",
+            "type": "string",
+            "usage": "repo to check (default: the current directory, if it is a repo)"
+          }
+        ],
+        "long": "Check the install, config, sound files, audio player, git version, and\nthe repo in the current directory (or --repo), and report each problem with\na severity and a fix. The report has the same fields as \"jingle status\",\nplus \"repo\" when a repo was checked.\n\nProblems with severity \"error\" stop sounds; \"warning\" means sounds play but\nnot as configured (e.g. push plays on attempt rather than on success).\n\nThe repo check catches a repo-level core.hooksPath (husky and similar tools\nset one), which overrides jingle's global hooks in that repo. Outside a repo\nit is skipped, unless --repo is given.\n\nExit codes: 0 when there are no errors (warnings allowed); 1 when at least\none error was found (code \"problems_found\"; the report is still printed on\nstdout), or --repo is not a git repository (code \"not_a_repo\").",
+        "path": "doctor",
+        "runnable": true,
+        "short": "Find everything that would keep jingle silent, with fixes",
+        "usage": "jingle doctor",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle install --dry-run --json",
+          "jingle install --yes",
+          "jingle install --yes --json"
+        ],
+        "flags": [
+          {
+            "default": "false",
+            "name": "dry-run",
+            "type": "bool",
+            "usage": "print what would change without changing anything"
+          },
+          {
+            "default": "false",
+            "name": "yes",
+            "type": "bool",
+            "usage": "confirm changing global git config"
+          }
+        ],
+        "long": "Install jingle's git hooks globally by pointing the global core.hooksPath\nat jingle's hooks dir. Works in every repo with no per-repo setup.\n\nYour existing hooks keep running: each jingle hook first runs the hook git\nwould have run without jingle (the repo's .git/hooks, or your previous global\ncore.hooksPath), with the same args, stdin, and exit status. The previous\ncore.hooksPath is saved so \"jingle uninstall\" can restore it exactly.\n\nRepos that set their own core.hooksPath (husky and similar) override the\nglobal one, so jingle does not play in them; \"jingle doctor\" run inside a\nrepo reports this.\n\nRequires --yes (or --dry-run to preview). Safe to re-run: reports \"unchanged\".",
+        "path": "install",
+        "runnable": true,
+        "short": "Turn on jingle for every repo (sets global core.hooksPath)",
+        "usage": "jingle install",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle play commit",
+          "jingle play push --wait --json",
+          "jingle play commit --sound tag2.mp3 --wait"
+        ],
+        "flags": [
+          {
+            "default": "",
+            "name": "sound",
+            "type": "string",
+            "usage": "play this one of the event's sounds instead of a random one"
+          },
+          {
+            "default": "false",
+            "name": "wait",
+            "type": "bool",
+            "usage": "wait for playback to finish"
+          }
+        ],
+        "long": "Play the sound configured for an event, without committing or pushing.\nPlays even if the event (or jingle) is turned off, and ignores the\ncooldown; the result reports \"enabled\" so you can tell whether it would\nplay on a real commit or push.\n\nBy default the player starts in the background, as it does from a git hook.\nUse --wait to block until playback ends and see player errors.\n\nAn event with several sounds plays one at random; --sound picks one (by\nits entry, original file, or file name, as \"config remove\" matches them).",
+        "path": "play",
+        "runnable": true,
+        "short": "Play an event's sound now, to test setup",
+        "usage": "jingle play <commit|push|merge>",
+        "valid_args": [
+          "commit",
+          "push",
+          "merge"
+        ]
+      },
+      {
+        "examples": [
+          "jingle schema",
+          "jingle schema | jq '.config_keys[] | {key, default}'"
+        ],
+        "flags": [],
+        "long": "Print a machine-readable description of jingle: every command with its\nusage, flags, and examples; the config keys with their types, defaults, and\nallowed values; the built-in sounds; and the exit, error, and problem codes.\nThe output is always JSON (--json changes nothing). Its fields are part of\nthe JSON contract, versioned by schema_version.",
+        "path": "schema",
+        "runnable": true,
+        "short": "Describe every command, flag, config key, and code as JSON",
+        "usage": "jingle schema",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle skill",
+          "mkdir -p ~/.claude/skills/jingle && jingle skill > ~/.claude/skills/jingle/SKILL.md",
+          "jingle skill --json"
+        ],
+        "flags": [],
+        "long": "Print jingle's agent skill: step-by-step instructions an AI coding agent\nfollows to install, configure, check, and remove jingle. It is a Claude Code\nskill (SKILL.md with frontmatter), and plain markdown for any other agent. It\nmatches this jingle version.\n\nClaude Code users can also install it from the plugin marketplace:\n  /plugin marketplace add OPDhaker/jingle\n  /plugin install jingle@jingle",
+        "path": "skill",
+        "runnable": true,
+        "short": "Print setup instructions for AI agents (a Claude Code skill)",
+        "usage": "jingle skill",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle status",
+          "jingle status --json"
+        ],
+        "flags": [],
+        "long": "Report everything needed to decide what to do next: whether jingle is\ninstalled, the global/system/previous core.hooksPath, the effective config,\nthe detected audio player, the git version, and any problems (each with a\nseverity and a fix). Always exits 0 when it can report; check \"problems\" for\nissues, or use \"jingle doctor\", which also checks the current repo and exits\n1 when something needs fixing.",
+        "path": "status",
+        "runnable": true,
+        "short": "Show install state, settings, player, and problems",
+        "usage": "jingle status",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle uninstall --dry-run --json",
+          "jingle uninstall --yes",
+          "jingle uninstall --yes --json",
+          "jingle uninstall --yes --purge"
+        ],
+        "flags": [
+          {
+            "default": "false",
+            "name": "dry-run",
+            "type": "bool",
+            "usage": "print what would change without changing anything"
+          },
+          {
+            "default": "false",
+            "name": "purge",
+            "type": "bool",
+            "usage": "also delete jingle's config and imported sounds"
+          },
+          {
+            "default": "false",
+            "name": "yes",
+            "type": "bool",
+            "usage": "confirm changing global git config"
+          }
+        ],
+        "long": "Remove jingle's global hooks and restore the global core.hooksPath that was\nset before \"jingle install\" (or unset it if there was none). If install\ncreated the [core] section or the global gitconfig file, those are removed\ntoo, so the file ends up byte-for-byte as before.\n\nIf something else changed core.hooksPath after install, it is left alone.\nYour config and imported sounds are kept, so a later install picks them up.\nWith --purge they are deleted too, along with jingle's config and data dirs\n(a dir is kept if it holds files jingle did not create). The jingle binary\nitself is not removed; delete it with your package manager or rm.\n\nRequires --yes (or --dry-run to preview). Safe to re-run: reports \"unchanged\".",
+        "path": "uninstall",
+        "runnable": true,
+        "short": "Turn off jingle everywhere and restore your git config",
+        "usage": "jingle uninstall",
+        "valid_args": []
+      },
+      {
+        "examples": [
+          "jingle version",
+          "jingle version --json"
+        ],
+        "flags": [],
+        "long": "",
+        "path": "version",
+        "runnable": true,
+        "short": "Print the jingle version",
+        "usage": "jingle version",
+        "valid_args": []
+      }
+    ],
+    "config_keys": [
+      {
+        "default": true,
+        "doc": "master switch; false mutes everything but leaves the hooks installed",
+        "key": "enabled",
+        "type": "bool"
+      },
+      {
+        "default": 3,
+        "doc": "seconds of quiet after a sound, per event, so a burst of commits plays once (0 = off)",
+        "key": "cooldown",
+        "max": 3600,
+        "min": 0,
+        "type": "int"
+      },
+      {
+        "default": 100,
+        "doc": "playback volume; needs afplay, pw-play, paplay, or ffplay",
+        "key": "volume",
+        "max": 100,
+        "min": 0,
+        "type": "int"
+      },
+      {
+        "default": true,
+        "doc": "play on git commit",
+        "key": "commit.enabled",
+        "type": "bool"
+      },
+      {
+        "default": [
+          "builtin:chime"
+        ],
+        "doc": "sounds for commit, one picked at random: audio files (copied into jingle's data dir) or builtin:<name>",
+        "key": "commit.sounds",
+        "type": "list"
+      },
+      {
+        "default": true,
+        "doc": "play on git push",
+        "key": "push.enabled",
+        "type": "bool"
+      },
+      {
+        "default": [
+          "builtin:fanfare"
+        ],
+        "doc": "sounds for push, one picked at random: audio files (copied into jingle's data dir) or builtin:<name>",
+        "key": "push.sounds",
+        "type": "list"
+      },
+      {
+        "default": "success",
+        "doc": "success: play once the push went through (git 2.28+); attempt: play when pre-push passes",
+        "key": "push.when",
+        "type": "string",
+        "values": [
+          "success",
+          "attempt"
+        ]
+      },
+      {
+        "default": false,
+        "doc": "play when a merge makes a merge commit (fast-forwards and squashes stay quiet)",
+        "key": "merge.enabled",
+        "type": "bool"
+      },
+      {
+        "default": [
+          "builtin:harmony"
+        ],
+        "doc": "sounds for merge, one picked at random: audio files (copied into jingle's data dir) or builtin:<name>",
+        "key": "merge.sounds",
+        "type": "list"
+      }
+    ],
+    "env": [
+      {
+        "meaning": "put jingle's config and data in this one dir (tests, portable installs)",
+        "name": "JINGLE_HOME"
+      },
+      {
+        "meaning": "use this executable as the audio player, called as <exe> <file>",
+        "name": "JINGLE_PLAYER"
+      },
+      {
+        "meaning": "config dir is $XDG_CONFIG_HOME/jingle (default ~/.config/jingle)",
+        "name": "XDG_CONFIG_HOME"
+      },
+      {
+        "meaning": "data dir (hooks, sounds, state) is $XDG_DATA_HOME/jingle (default ~/.local/share/jingle)",
+        "name": "XDG_DATA_HOME"
+      },
+      {
+        "meaning": "no color in plain output",
+        "name": "NO_COLOR"
+      }
+    ],
+    "error_codes": [
+      {
+        "code": "usage",
+        "exit": 2,
+        "meaning": "Unknown command or flag, wrong number of arguments."
+      },
+      {
+        "code": "confirmation_required",
+        "exit": 2,
+        "meaning": "`install`/`uninstall` without `--yes` or `--dry-run`."
+      },
+      {
+        "code": "invalid_key",
+        "exit": 2,
+        "meaning": "`config` with an unknown key, or `add`/`remove` on a key that isn't a sound list."
+      },
+      {
+        "code": "invalid_value",
+        "exit": 2,
+        "meaning": "`config set` with a value of the wrong type or out of range, an audio file of an unsupported type, or an unknown `builtin:` sound; `config remove` of a sound that isn't in the list."
+      },
+      {
+        "code": "unknown_event",
+        "exit": 2,
+        "meaning": "`play` with an event other than `commit`, `push`, `merge`."
+      },
+      {
+        "code": "not_a_repo",
+        "exit": 1,
+        "meaning": "`doctor --repo <dir>` where the dir isn't in a git repository."
+      },
+      {
+        "code": "git_not_found",
+        "exit": 1,
+        "meaning": "git is not installed or not on PATH."
+      },
+      {
+        "code": "git_failed",
+        "exit": 1,
+        "meaning": "`doctor`: a git command failed unexpectedly while checking the repo."
+      },
+      {
+        "code": "install_failed",
+        "exit": 1,
+        "meaning": "`install` could not finish (git config or file write failed). Safe to retry."
+      },
+      {
+        "code": "uninstall_failed",
+        "exit": 1,
+        "meaning": "`uninstall` could not finish. Safe to retry."
+      },
+      {
+        "code": "config_invalid",
+        "exit": 1,
+        "meaning": "The config file can't be parsed."
+      },
+      {
+        "code": "sound_not_found",
+        "exit": 1,
+        "meaning": "`config set/add` with a file that doesn't exist, or `play --sound` naming a sound that isn't in the event's list."
+      },
+      {
+        "code": "no_sound",
+        "exit": 1,
+        "meaning": "`play` for an event with no sounds set."
+      },
+      {
+        "code": "sound_missing",
+        "exit": 1,
+        "meaning": "`play`: every sound file for the event is gone."
+      },
+      {
+        "code": "no_player",
+        "exit": 1,
+        "meaning": "No audio player found, or `JINGLE_PLAYER` isn't executable."
+      },
+      {
+        "code": "player_failed",
+        "exit": 1,
+        "meaning": "The player could not be started (or, with `play --wait`, exited non-zero)."
+      },
+      {
+        "code": "paths_unavailable",
+        "exit": 1,
+        "meaning": "The config or data dir can't be determined (no home dir)."
+      },
+      {
+        "code": "io_error",
+        "exit": 1,
+        "meaning": "Some other filesystem error."
+      },
+      {
+        "code": "problems_found",
+        "exit": 1,
+        "meaning": "`doctor` found at least one `error` problem. The report is still on stdout."
+      }
+    ],
+    "events": [
+      "commit",
+      "push",
+      "merge"
+    ],
+    "exit_codes": [
+      {
+        "code": 0,
+        "meaning": "The requested state was reached, including \"unchanged\" (already that way)."
+      },
+      {
+        "code": 1,
+        "meaning": "Error: the requested state was not reached. For `doctor`: at least one problem has severity `error`."
+      },
+      {
+        "code": 2,
+        "meaning": "Usage: bad command, flag, or argument, or `--yes` missing on `install`/`uninstall`."
+      }
+    ],
+    "global_flags": [
+      {
+        "default": "false",
+        "name": "json",
+        "type": "bool",
+        "usage": "print machine-readable JSON"
+      }
+    ],
+    "problem_codes": [
+      {
+        "code": "not_installed",
+        "meaning": "Hooks aren't installed.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "hooks_path_overridden",
+        "meaning": "Something changed the global `core.hooksPath` after install.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "repo_hooks_path_override",
+        "meaning": "This repo sets its own `core.hooksPath` (husky and similar), so jingle doesn't run here.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "shims_outdated",
+        "meaning": "Installed hooks are from another jingle version.",
+        "severities": [
+          "warning"
+        ]
+      },
+      {
+        "code": "jingle_binary_moved",
+        "meaning": "The binary the hooks call is gone, but `jingle` is on PATH.",
+        "severities": [
+          "warning"
+        ]
+      },
+      {
+        "code": "jingle_binary_missing",
+        "meaning": "The binary the hooks call is gone and `jingle` isn't on PATH.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "config_invalid",
+        "meaning": "The config file can't be parsed.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "no_sound",
+        "meaning": "An enabled event has no sounds.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "sound_missing",
+        "meaning": "Every sound file for an event is gone, or names an unknown built-in (error), or only some of them are (warning).",
+        "severities": [
+          "error",
+          "warning"
+        ]
+      },
+      {
+        "code": "no_player",
+        "meaning": "No audio player found, or `JINGLE_PLAYER` is bad.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "volume_unsupported",
+        "meaning": "`volume` < 100 but the player can't change the volume.",
+        "severities": [
+          "warning"
+        ]
+      },
+      {
+        "code": "git_not_found",
+        "meaning": "git isn't installed.",
+        "severities": [
+          "error"
+        ]
+      },
+      {
+        "code": "git_too_old",
+        "meaning": "git < 2.28: push plays on attempt, not on success.",
+        "severities": [
+          "warning"
+        ]
+      },
+      {
+        "code": "git_failed",
+        "meaning": "A git command failed unexpectedly.",
+        "severities": [
+          "error"
+        ]
+      }
+    ],
+    "schema_version": 1,
+    "version": "<machine>"
+  }
+}

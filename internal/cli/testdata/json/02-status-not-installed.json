@@ -5,13 +5,19 @@
     "chain_dir": "",
     "config": {
       "commit.enabled": true,
-      "commit.sounds": [],
+      "commit.sounds": [
+        "builtin:chime"
+      ],
       "cooldown": 3,
       "enabled": true,
       "merge.enabled": false,
-      "merge.sounds": [],
+      "merge.sounds": [
+        "builtin:harmony"
+      ],
       "push.enabled": true,
-      "push.sounds": [],
+      "push.sounds": [
+        "builtin:fanfare"
+      ],
       "push.when": "success",
       "volume": 100
     },
@@ -37,18 +43,6 @@
         "code": "not_installed",
         "fix": "jingle install --yes",
         "message": "jingle's hooks are not installed",
-        "severity": "error"
-      },
-      {
-        "code": "no_sound",
-        "fix": "jingle config set commit.sounds <file>",
-        "message": "no sound set for commit",
-        "severity": "error"
-      },
-      {
-        "code": "no_sound",
-        "fix": "jingle config set push.sounds <file>",
-        "message": "no sound set for push",
         "severity": "error"
       }
     ],

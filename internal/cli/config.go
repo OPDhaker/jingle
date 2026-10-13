@@ -9,11 +9,12 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/config"
 	"github.com/OPDhaker/jingle/internal/output"
 )
 
-const configKeysHelp = `Keys:
+var configKeysHelp = `Keys:
   enabled          true|false  master switch
   cooldown         <seconds>   quiet time after a sound, per event, so a
                                burst of commits plays once (default 3, 0 off)
@@ -33,6 +34,10 @@ const configKeysHelp = `Keys:
 
 Booleans also accept on/off. Sound files (` + "mp3 wav aiff aif m4a ogg flac" + `) are
 copied into jingle's data dir, so moving the original later is fine.
+
+Built-in sounds need no file; use them by name in any sounds list:
+` + builtinHelp() + `
+
 "config set <event>.sounds" replaces the whole list ("" clears it);
 "config add" and "config remove" change one entry at a time.
 
@@ -40,6 +45,23 @@ push.when success needs git 2.28+. With older git, and for pushes to a URL
 rather than a named remote (no remote-tracking ref moves), push plays on
 attempt. A merge that stops on a conflict plays the commit sound when you
 commit the resolution.`
+
+// builtinHelp lists the built-in sounds and which events use them by default.
+func builtinHelp() string {
+	defaults := config.Default()
+	var b strings.Builder
+	for _, name := range builtin.Names() {
+		entry := builtin.Prefix + name
+		fmt.Fprintf(&b, "  %-16s %s", entry, builtin.Doc(name))
+		for _, ev := range config.Events {
+			if slices.Contains(defaults.Event(ev).Sounds, entry) {
+				fmt.Fprintf(&b, " (%s default)", ev)
+			}
+		}
+		b.WriteByte('\n')
+	}
+	return strings.TrimSuffix(b.String(), "\n")
+}
 
 func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 	cmd := &cobra.Command{
@@ -49,6 +71,7 @@ func newConfigCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
 		Example: `  jingle config list --json
   jingle config get commit.sounds
   jingle config set commit.sounds ~/Music/tag.mp3
+  jingle config set push.sounds builtin:boom
   jingle config add commit.sounds ~/Music/tag2.mp3 ~/Music/tag3.wav
   jingle config remove commit.sounds tag2.mp3
   jingle config set push.enabled false
@@ -267,6 +290,13 @@ func loadSoundsKey(key string) (config.Paths, config.Config, string, error) {
 func importSounds(p config.Paths, event string, files []string) (list []string, wrote bool, err error) {
 	for _, f := range files {
 		if f == "" {
+			continue
+		}
+		if name, ok := builtin.Parse(f); ok {
+			if !builtin.Exists(name) {
+				return nil, false, output.Errorf("invalid_value", output.ExitUsage, "unknown built-in sound %q (have: %s)", f, strings.Join(builtin.Entries(), ", "))
+			}
+			list = append(list, f)
 			continue
 		}
 		dest, w, err := config.ImportSound(p, event, f)

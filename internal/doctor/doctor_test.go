@@ -87,6 +87,9 @@ func TestSoundMissingSeverity(t *testing.T) {
 		{[]string{gone}, "sound_missing", Error},
 		{[]string{have, gone}, "sound_missing", Warning},
 		{[]string{have}, "", ""},
+		{[]string{"builtin:chime"}, "", ""},
+		{[]string{"builtin:nope"}, "sound_missing", Error},
+		{[]string{"builtin:chime", gone}, "sound_missing", Warning},
 	} {
 		cfg.Commit.Sounds = tt.sounds
 		if err := config.Save(env.Paths, cfg); err != nil {

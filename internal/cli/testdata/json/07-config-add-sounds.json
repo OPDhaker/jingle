@@ -5,6 +5,7 @@
     "changed": true,
     "key": "push.sounds",
     "value": [
+      "builtin:fanfare",
       "$ROOT/jingle/sounds/push-tag.wav"
     ]
   }

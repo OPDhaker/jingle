@@ -74,10 +74,11 @@ func TestInstallUninstallNeedYes(t *testing.T) {
 
 func TestHookEventNeverFailsOrPrints(t *testing.T) {
 	t.Setenv("JINGLE_HOME", t.TempDir())
+	t.Setenv("JINGLE_PLAYER", "true") // the default built-in sound plays, silently
 	for _, args := range [][]string{
 		{"hook-event"},
 		{"hook-event", "bogus", "--json"},
-		{"hook-event", "commit"}, // no sound configured
+		{"hook-event", "commit"},
 	} {
 		code, stdout, stderr := run(args...)
 		if code != output.ExitOK || stdout != "" || stderr != "" {
@@ -88,6 +89,7 @@ func TestHookEventNeverFailsOrPrints(t *testing.T) {
 
 func TestConfigErrors(t *testing.T) {
 	t.Setenv("JINGLE_HOME", t.TempDir())
+	t.Setenv("JINGLE_PLAYER", "true")
 	tests := []struct {
 		args []string
 		code string
@@ -100,8 +102,12 @@ func TestConfigErrors(t *testing.T) {
 		{[]string{"config", "set", "enabled", "on", "off"}, "usage", output.ExitUsage},
 		{[]string{"config", "add", "enabled", "x.mp3"}, "invalid_key", output.ExitUsage},
 		{[]string{"config", "remove", "commit.sounds", "nope.mp3"}, "invalid_value", output.ExitUsage},
-		{[]string{"play", "commit", "--sound", "x.mp3"}, "no_sound", output.ExitError},
+		{[]string{"config", "set", "commit.sounds", "builtin:nope"}, "invalid_value", output.ExitUsage},
+		{[]string{"play", "commit", "--sound", "x.mp3"}, "sound_not_found", output.ExitError},
 		{[]string{"play", "deploy"}, "unknown_event", output.ExitUsage},
+		{[]string{"play", "commit"}, "", output.ExitOK}, // the default built-in
+		{[]string{"config", "set", "commit.sounds", ""}, "", output.ExitOK},
+		{[]string{"play", "commit", "--sound", "x.mp3"}, "no_sound", output.ExitError},
 		{[]string{"play", "commit"}, "no_sound", output.ExitError},
 	}
 	for _, tt := range tests {

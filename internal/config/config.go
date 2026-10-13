@@ -13,6 +13,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
+	"github.com/OPDhaker/jingle/internal/builtin"
 	"github.com/OPDhaker/jingle/internal/fsutil"
 )
 
@@ -70,9 +71,9 @@ func Default() Config {
 		Enabled:  true,
 		Cooldown: 3,
 		Volume:   100,
-		Commit:   Event{Enabled: true},
-		Push:     Event{Enabled: true, When: PushSuccess},
-		Merge:    Event{Enabled: false},
+		Commit:   Event{Enabled: true, Sounds: []string{builtin.Prefix + "chime"}},
+		Push:     Event{Enabled: true, Sounds: []string{builtin.Prefix + "fanfare"}, When: PushSuccess},
+		Merge:    Event{Enabled: false, Sounds: []string{builtin.Prefix + "harmony"}},
 	}
 }
 
@@ -116,6 +117,11 @@ func Load(p Paths) (Config, error) {
 	}
 	for _, name := range Events {
 		ev := cfg.Event(name)
+		if !md.IsDefined(name, "sounds") && md.IsDefined(name, "sound") {
+			// A legacy file without a list: its one sound (or none) replaces
+			// the default, rather than joining the built-in.
+			ev.Sounds = nil
+		}
 		if ev.Sound != "" {
 			ev.Sounds = slices.Insert(slices.DeleteFunc(ev.Sounds, func(s string) bool { return s == ev.Sound }), 0, ev.Sound)
 			ev.Sound = ""
@@ -140,6 +146,13 @@ func Load(p Paths) (Config, error) {
 
 // Save writes the config file atomically.
 func Save(p Paths, cfg Config) error {
+	// The encoder drops nil lists, and a missing key loads as the default
+	// sound, so a cleared list must be written as [].
+	for _, name := range Events {
+		if ev := cfg.Event(name); ev.Sounds == nil {
+			ev.Sounds = []string{}
+		}
+	}
 	var buf bytes.Buffer
 	buf.WriteString("# jingle config. Edit with `jingle config set <key> <value>`; see `jingle config --help`.\n")
 	if err := toml.NewEncoder(&buf).Encode(cfg); err != nil {
@@ -148,8 +161,50 @@ func Save(p Paths, cfg Config) error {
 	return fsutil.WriteFileAtomic(p.ConfigFile(), buf.Bytes(), 0o644)
 }
 
+// KeyInfo describes one config key for `jingle schema`.
+type KeyInfo struct {
+	Key  string `json:"key"`
+	Type string `json:"type"` // bool, int, string, or list (of strings)
+	// Values are the allowed values of a string key.
+	Values []string `json:"values,omitempty"`
+	// Min and Max bound an int key.
+	Min *int   `json:"min,omitempty"`
+	Max *int   `json:"max,omitempty"`
+	Doc string `json:"doc"`
+}
+
+func bounds(lo, hi int) (*int, *int) { return &lo, &hi }
+
+// KeyInfos describes every config key, in display order.
+var KeyInfos = func() []KeyInfo {
+	cdMin, cdMax := bounds(0, MaxCooldown)
+	volMin, volMax := bounds(0, 100)
+	sounds := func(ev string) KeyInfo {
+		return KeyInfo{Key: ev + ".sounds", Type: "list",
+			Doc: "sounds for " + ev + ", one picked at random: audio files (copied into jingle's data dir) or builtin:<name>"}
+	}
+	return []KeyInfo{
+		{Key: "enabled", Type: "bool", Doc: "master switch; false mutes everything but leaves the hooks installed"},
+		{Key: "cooldown", Type: "int", Min: cdMin, Max: cdMax, Doc: "seconds of quiet after a sound, per event, so a burst of commits plays once (0 = off)"},
+		{Key: "volume", Type: "int", Min: volMin, Max: volMax, Doc: "playback volume; needs afplay, pw-play, paplay, or ffplay"},
+		{Key: "commit.enabled", Type: "bool", Doc: "play on git commit"},
+		sounds("commit"),
+		{Key: "push.enabled", Type: "bool", Doc: "play on git push"},
+		sounds("push"),
+		{Key: "push.when", Type: "string", Values: []string{PushSuccess, PushAttempt}, Doc: "success: play once the push went through (git 2.28+); attempt: play when pre-push passes"},
+		{Key: "merge.enabled", Type: "bool", Doc: "play when a merge makes a merge commit (fast-forwards and squashes stay quiet)"},
+		sounds("merge"),
+	}
+}()
+
 // Keys lists every config key, in display order.
-var Keys = []string{"enabled", "cooldown", "volume", "commit.enabled", "commit.sounds", "push.enabled", "push.sounds", "push.when", "merge.enabled", "merge.sounds"}
+var Keys = func() []string {
+	keys := make([]string, len(KeyInfos))
+	for i, k := range KeyInfos {
+		keys[i] = k.Key
+	}
+	return keys
+}()
 
 // SoundsKey reports whether key is an "<event>.sounds" list key, and for
 // which event.
@@ -386,12 +441,19 @@ func (c *Config) MatchSound(p Paths, event, name string) (entry string, ok bool)
 		if b := filepath.Base(s); b == base || strings.TrimPrefix(b, event+"-") == base {
 			return s, true
 		}
+		if n, ok := builtin.Parse(s); ok && n == name {
+			return s, true
+		}
 	}
 	return "", false
 }
 
-// SoundFile returns the absolute path of a sounds list entry.
+// SoundFile returns the absolute path of a sounds list entry. A built-in
+// entry maps to the file builtin.Ensure writes.
 func SoundFile(p Paths, s string) string {
+	if name, ok := builtin.Parse(s); ok {
+		return builtin.File(p.SoundsDir(), name)
+	}
 	if filepath.IsAbs(s) {
 		return s
 	}

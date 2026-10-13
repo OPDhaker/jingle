@@ -1,0 +1,12 @@
+{
+  "name": "jingle",
+  "description": "Set up jingle: a sound (producer tag) on every git commit and push, in every repo, installed once.",
+  "author": {
+    "name": "Om Pratap Dhaker",
+    "url": "https://github.com/OPDhaker"
+  },
+  "homepage": "https://github.com/OPDhaker/jingle",
+  "repository": "https://github.com/OPDhaker/jingle",
+  "license": "MIT",
+  "keywords": ["git", "hooks", "sound", "producer-tag"]
+}
