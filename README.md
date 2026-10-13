@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="gui/assets/jingle-light.svg">
+  <img src="gui/assets/jingle.svg" width="64" height="64" alt="">
+</picture>
+
 # jingle
 
 Play a producer tag when you `git commit` or `git push`.

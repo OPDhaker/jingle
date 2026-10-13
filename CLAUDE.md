@@ -18,6 +18,7 @@ make fmt                                    # gofmt + goimports via golangci-lin
 go test ./internal/cli -run TestJSONGolden -update   # regenerate JSON golden files
 make gui-test                               # GUI: pnpm build (typecheck) + cargo fmt/clippy/test
 make gui-dev                                # run the menu-bar app (uses jingle on PATH or $JINGLE_BIN)
+make gui-icons                              # re-render app + tray icons from gui/assets/*.svg (needs ImageMagick)
 goreleaser release --snapshot --clean       # local release build → dist/, publishes nothing
 scripts/e2e-clean-machine.sh dist           # install.sh → install → play → uninstall --purge, temp HOME
 ```

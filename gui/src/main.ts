@@ -112,7 +112,7 @@ function notFoundView(snap: Snapshot): HTMLElement {
   return h(
     "main",
     { class: "empty" },
-    h("img", { src: "/icon.png", alt: "", class: "empty-icon" }),
+    h("span", { class: "empty-icon" }, icons.logo()),
     h("h1", {}, missing ? "Install the jingle command-line tool" : "jingle isn't responding"),
     missing
       ? h("p", {}, "This app is a front end for the jingle CLI, which does the actual work. Install it with one of these, then try again:")
@@ -132,7 +132,7 @@ function header(snap: Snapshot): HTMLElement {
   return h(
     "header",
     {},
-    h("img", { src: "/icon.png", alt: "", class: "logo" }),
+    h("span", { class: "logo" }, icons.logo()),
     h("div", { class: "title" }, h("h1", {}, "Jingle"), h("span", { class: `pill ${tone}` }, snap.headline)),
     s.installed && toggle("Sounds on", s.config.enabled === true, (v) => void run(() => api.configSet("enabled", [String(v)]))),
   );

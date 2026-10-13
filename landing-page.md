@@ -14,7 +14,7 @@ Copy for each section, top to bottom. Notes for design and build are in *[bracke
 
 ## 1. Nav
 
-- Logo → home
+- Logo → home (`gui/assets/jingle.svg`; `gui/assets/jingle-light.svg` on dark backgrounds)
 - **Docs** → GitHub README
 - GitHub icon → https://github.com/OPDhaker/jingle
 - **Install** button → scrolls to section 4
