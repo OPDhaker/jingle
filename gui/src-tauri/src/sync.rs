@@ -66,7 +66,7 @@ pub fn last(app: &AppHandle) -> Snapshot {
 pub fn refresh(app: &AppHandle) -> Snapshot {
     let mut snap = match current(app) {
         Err(e) => Snapshot { error: Some(e), ..Default::default() },
-        Ok(j) => match j.run(&["status"], &[]) {
+        Ok(j) => match j.check_compatible().and_then(|()| j.run(&["status"], &[])) {
             Ok(status) => Snapshot { jingle: Some(j), status: Some(status), ..Default::default() },
             Err(e) => Snapshot { jingle: Some(j), error: Some(e), ..Default::default() },
         },

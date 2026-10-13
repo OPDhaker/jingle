@@ -4,9 +4,6 @@
 
 import { invoke } from "@tauri-apps/api/core";
 
-/** The schema_version of docs/json.md this GUI was written against. */
-export const SCHEMA_VERSION = 1;
-
 export interface JingleError {
   code: string;
   message: string;

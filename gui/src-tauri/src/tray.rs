@@ -113,6 +113,8 @@ pub fn headline(snap: &Snapshot) -> String {
     let Some(status) = snap.status.as_ref() else {
         return match &snap.error {
             Some(e) if e.code == crate::jingle::CODE_NOT_FOUND => "jingle CLI not found".into(),
+            Some(e) if e.code == crate::jingle::CODE_CLI_OLD => "jingle CLI needs an update".into(),
+            Some(e) if e.code == crate::jingle::CODE_APP_OLD => "This app needs an update".into(),
             _ => "jingle isn't responding".into(),
         };
     };

@@ -7,7 +7,7 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 
-import { api, errorMessage, SCHEMA_VERSION, type Problem, type RepoReport, type Schema, type Snapshot, type Version } from "./api";
+import { api, errorMessage, type Problem, type RepoReport, type Schema, type Snapshot, type Version } from "./api";
 import { h, icons, toggle } from "./dom";
 import "./style.css";
 
@@ -107,19 +107,50 @@ function view(): HTMLElement {
   return h("main", {}, header(snap), setupCard(snap), problemsCard(snap.status.problems), eventsSection(snap), generalCard(snap), repoCard(), footer(snap));
 }
 
+const INSTALL_SCRIPT = "curl -fsSL https://raw.githubusercontent.com/OPDhaker/jingle/main/install.sh | sh";
+
+/** Why there's no status, and what to run about it. */
+function notFoundCopy(snap: Snapshot): { title: string; text: string; commands: string[]; detail?: string } {
+  const e = snap.error;
+  if (!snap.jingle) {
+    return {
+      title: "Install the jingle command-line tool",
+      text: "This app is a front end for the jingle CLI, which does the actual work. Install it with one of these, then try again:",
+      commands: ["brew install OPDhaker/tap/jingle", INSTALL_SCRIPT],
+      detail: e?.message,
+    };
+  }
+  if (e?.code === "cli_too_old") {
+    return {
+      title: "Update the jingle command-line tool",
+      text: "This app needs a newer jingle than the one installed. Update it the way you installed it, then try again:",
+      commands: ["brew upgrade OPDhaker/tap/jingle", INSTALL_SCRIPT],
+      detail: e.message,
+    };
+  }
+  if (e?.code === "cli_too_new") {
+    return {
+      title: "Update this app",
+      text: "Your jingle is newer than this app understands. Update the app, then open it again:",
+      commands: ["brew upgrade --cask OPDhaker/tap/jingle-app"],
+      detail: e.message,
+    };
+  }
+  return { title: "jingle isn't responding", text: e?.message ?? "Unknown error.", commands: [] };
+}
+
 function notFoundView(snap: Snapshot): HTMLElement {
-  const missing = !snap.jingle;
+  const c = notFoundCopy(snap);
   return h(
     "main",
     { class: "empty" },
     h("span", { class: "empty-icon" }, icons.logo()),
-    h("h1", {}, missing ? "Install the jingle command-line tool" : "jingle isn't responding"),
-    missing
-      ? h("p", {}, "This app is a front end for the jingle CLI, which does the actual work. Install it with one of these, then try again:")
-      : h("p", {}, snap.error?.message ?? "Unknown error."),
-    missing && h("pre", {}, "brew install OPDhaker/tap/jingle"),
-    missing && h("pre", {}, "curl -fsSL https://raw.githubusercontent.com/OPDhaker/jingle/main/install.sh | sh"),
-    missing && snap.error && h("p", { class: "muted small" }, snap.error.message),
+    h("h1", {}, c.title),
+    h("p", {}, c.text),
+    c.commands.map((cmd) => h("pre", {}, cmd)),
+    snap.error?.code === "cli_too_new" &&
+      h("p", { class: "small" }, "Or download it again from ", h("code", {}, "github.com/OPDhaker/jingle/releases"), "."),
+    c.detail && h("p", { class: "muted small" }, c.detail),
     h("button", { class: "primary", disabled: state.busy, onclick: () => void relocate() }, state.busy ? "Looking…" : "Try again"),
   );
 }
@@ -438,11 +469,9 @@ async function pickRepo() {
 function footer(snap: Snapshot): HTMLElement {
   const s = snap.status!;
   const v = state.version;
-  const mismatch = v && v.schema_version !== SCHEMA_VERSION;
   return h(
     "footer",
     {},
-    mismatch && h("p", { class: "warn small" }, `This app expects jingle's JSON schema ${SCHEMA_VERSION}, but jingle reports ${v.schema_version}. Update the app or jingle.`),
     h("p", { class: "muted small" }, `jingle ${v?.version ?? ""} · ${snap.jingle?.bin ?? ""}`, s.player ? ` · player: ${s.player.name}` : ""),
     s.installed &&
       h(

@@ -24,6 +24,13 @@ pub const CODE_NOT_FOUND: &str = "cli_not_found";
 pub const CODE_SPAWN: &str = "cli_spawn_failed";
 pub const CODE_TIMEOUT: &str = "cli_timeout";
 pub const CODE_BAD_OUTPUT: &str = "cli_bad_output";
+/// The installed jingle is older than this app needs.
+pub const CODE_CLI_OLD: &str = "cli_too_old";
+/// The installed jingle's JSON is newer than this app understands.
+pub const CODE_APP_OLD: &str = "cli_too_new";
+
+/// The `schema_version` of docs/json.md this app was written against.
+pub const SCHEMA_VERSION: u64 = 1;
 
 /// A failed jingle command: the CLI's error envelope, or a `cli_*` code when
 /// the CLI couldn't be run or answered with something that isn't JSON.
@@ -174,6 +181,42 @@ impl Jingle {
         let cmd = c;
         let out = run_with_timeout(cmd, RUN_TIMEOUT)?;
         parse_output(out)
+    }
+
+    /// Checks that this jingle has everything the app uses. `jingle schema`
+    /// came in Phase 4 and `sound_types` (which marks `jingle preview`) in
+    /// Phase 5, so an older jingle fails here instead of half working.
+    pub fn check_compatible(&self) -> Result<(), JingleError> {
+        let too_old = |version: &str| {
+            JingleError::new(
+                CODE_CLI_OLD,
+                format!("jingle {version} at {} is too old for this app.", self.bin.display()),
+            )
+        };
+        let schema = match self.run(&["schema"], &[]) {
+            Ok(s) => s,
+            Err(e) if e.code.starts_with("cli_") => return Err(e),
+            // No `jingle schema` at all; `jingle version` still names it.
+            Err(_) => {
+                let v = self.run(&["version"], &[]).ok();
+                let version = v.as_ref().and_then(|v| v.get("version")).and_then(Value::as_str);
+                return Err(too_old(version.unwrap_or("(unknown version)")));
+            }
+        };
+        let version = schema.get("version").and_then(Value::as_str).unwrap_or("(unknown version)");
+        let got = schema.get("schema_version").and_then(Value::as_u64).unwrap_or(0);
+        if got > SCHEMA_VERSION {
+            return Err(JingleError::new(
+                CODE_APP_OLD,
+                format!(
+                    "jingle {version} uses a newer JSON schema ({got}) than this app understands ({SCHEMA_VERSION})."
+                ),
+            ));
+        }
+        if got < SCHEMA_VERSION || schema.get("sound_types").is_none() {
+            return Err(too_old(version));
+        }
+        Ok(())
     }
 }
 
@@ -326,6 +369,33 @@ echo '{"error": {"code": "problems_found", "message": "1 problem"}}' >&2; exit 1
     fn missing_binary_is_spawn_error() {
         let e = run_with_timeout(Command::new("/no/such/jingle"), RUN_TIMEOUT).err().unwrap();
         assert_eq!(e.code, CODE_SPAWN);
+    }
+
+    #[test]
+    fn compatibility() {
+        let current = r#"echo '{"schema_version": 1, "version": "v0.1.0", "sound_types": [".wav"]}'"#;
+        let (_d, j) = fake(current);
+        assert_eq!(j.check_compatible(), Ok(()));
+
+        // Before `jingle schema`: cobra's usage error.
+        let (_d, j) = fake(
+            r#"[ "$1" = version ] && { echo '{"version": "v0.0.1"}'; exit 0; }
+echo '{"error": {"code": "usage", "message": "unknown command"}}' >&2; exit 2"#,
+        );
+        let e = j.check_compatible().unwrap_err();
+        assert_eq!(e.code, CODE_CLI_OLD);
+        assert!(e.message.contains("v0.0.1"), "{}", e.message);
+        // `jingle schema` without sound_types (no `jingle preview` yet).
+        let (_d, j) = fake(r#"echo '{"schema_version": 1, "version": "v0.0.9"}'"#);
+        let e = j.check_compatible().unwrap_err();
+        assert_eq!(e.code, CODE_CLI_OLD);
+        assert!(e.message.contains("v0.0.9"), "{}", e.message);
+        // A newer schema than the app knows.
+        let (_d, j) = fake(r#"echo '{"schema_version": 2, "version": "v9.0.0", "sound_types": []}'"#);
+        assert_eq!(j.check_compatible().unwrap_err().code, CODE_APP_OLD);
+        // A jingle that can't run at all keeps its own error.
+        let (_d, j) = fake("echo not json");
+        assert_eq!(j.check_compatible().unwrap_err().code, CODE_BAD_OUTPUT);
     }
 
     #[test]
