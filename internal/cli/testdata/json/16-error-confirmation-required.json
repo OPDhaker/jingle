@@ -1,0 +1,10 @@
+{
+  "exit": 2,
+  "stderr": {
+    "error": {
+      "code": "confirmation_required",
+      "message": "uninstall changes your global git config; pass --yes to confirm, or --dry-run to preview"
+    }
+  },
+  "stdout": null
+}

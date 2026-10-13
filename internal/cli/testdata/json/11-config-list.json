@@ -1,0 +1,21 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "path": "$ROOT/jingle/config.toml",
+    "values": {
+      "commit.enabled": true,
+      "commit.sounds": [
+        "$ROOT/jingle/sounds/commit-tag.wav"
+      ],
+      "cooldown": 3,
+      "enabled": true,
+      "merge.enabled": false,
+      "merge.sounds": [],
+      "push.enabled": true,
+      "push.sounds": [],
+      "push.when": "success",
+      "volume": 100
+    }
+  }
+}

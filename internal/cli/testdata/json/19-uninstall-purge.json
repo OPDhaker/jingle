@@ -1,0 +1,134 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "chain_dir": "",
+    "changes": [
+      {
+        "action": "unset_git_config",
+        "from": "$ROOT/jingle/hooks",
+        "target": "core.hooksPath"
+      },
+      {
+        "action": "remove_git_section",
+        "note": "only if no core.* keys remain",
+        "target": "core"
+      },
+      {
+        "action": "remove_file",
+        "note": "only if it is now empty",
+        "target": "$ROOT/gitconfig"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/applypatch-msg"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/commit-msg"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-applypatch"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-checkout"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-commit"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-index-change"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-merge"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-receive"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-rewrite"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/post-update"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-applypatch"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-auto-gc"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-commit"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-merge-commit"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-push"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-rebase"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/pre-receive"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/prepare-commit-msg"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/reference-transaction"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/sendemail-validate"
+      },
+      {
+        "action": "remove_hook",
+        "target": "$ROOT/jingle/hooks/update"
+      },
+      {
+        "action": "remove_dir",
+        "note": "only if empty",
+        "target": "$ROOT/jingle/hooks"
+      },
+      {
+        "action": "remove_state",
+        "target": "$ROOT/jingle/state.json"
+      },
+      {
+        "action": "remove_file",
+        "target": "$ROOT/jingle/config.toml"
+      },
+      {
+        "action": "remove_dir",
+        "note": "imported sounds",
+        "target": "$ROOT/jingle/sounds"
+      },
+      {
+        "action": "remove_dir",
+        "note": "only if empty",
+        "target": "$ROOT/jingle"
+      }
+    ],
+    "hooks_dir": "$ROOT/jingle/hooks",
+    "previous_hooks_path": null,
+    "status": "uninstalled"
+  }
+}

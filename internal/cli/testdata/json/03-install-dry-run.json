@@ -1,0 +1,105 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "chain_dir": "",
+    "changes": [
+      {
+        "action": "write_state",
+        "target": "$ROOT/jingle/state.json"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/applypatch-msg"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/commit-msg"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-applypatch"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-checkout"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-commit"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-index-change"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-merge"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-receive"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-rewrite"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/post-update"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-applypatch"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-auto-gc"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-commit"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-merge-commit"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-push"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-rebase"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/pre-receive"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/prepare-commit-msg"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/reference-transaction"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/sendemail-validate"
+      },
+      {
+        "action": "write_hook",
+        "target": "$ROOT/jingle/hooks/update"
+      },
+      {
+        "action": "set_git_config",
+        "target": "core.hooksPath",
+        "to": "$ROOT/jingle/hooks"
+      }
+    ],
+    "hooks_dir": "$ROOT/jingle/hooks",
+    "previous_hooks_path": null,
+    "status": "would_change"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "exit": 2,
+  "stderr": {
+    "error": {
+      "code": "usage",
+      "message": "unknown flag: --no-such-flag"
+    }
+  },
+  "stdout": null
+}

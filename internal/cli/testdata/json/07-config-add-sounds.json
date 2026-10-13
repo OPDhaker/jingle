@@ -1,0 +1,11 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "changed": true,
+    "key": "push.sounds",
+    "value": [
+      "$ROOT/jingle/sounds/push-tag.wav"
+    ]
+  }
+}

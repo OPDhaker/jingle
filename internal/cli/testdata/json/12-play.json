@@ -1,0 +1,18 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "enabled": true,
+    "event": "commit",
+    "player": {
+      "args": [],
+      "name": "JINGLE_PLAYER",
+      "path": "$ROOT/player",
+      "volume": false
+    },
+    "sound": "$ROOT/jingle/sounds/commit-tag.wav",
+    "sounds": 1,
+    "volume": 100,
+    "waited": false
+  }
+}

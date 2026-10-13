@@ -14,12 +14,17 @@ import (
 // version is set at build time: -ldflags "-X github.com/OPDhaker/jingle/internal/cli.version=v1.2.3".
 var version = "dev"
 
+// schemaVersion is the version of the --json output contract (docs/json.md).
+// Bump it only for a breaking change: a field renamed, removed, or retyped.
+const schemaVersion = 1
+
 type versionInfo struct {
-	Version string `json:"version"`
-	Commit  string `json:"commit"`
-	Go      string `json:"go"`
-	OS      string `json:"os"`
-	Arch    string `json:"arch"`
+	Version       string `json:"version"`
+	Commit        string `json:"commit"`
+	Go            string `json:"go"`
+	OS            string `json:"os"`
+	Arch          string `json:"arch"`
+	SchemaVersion int    `json:"schema_version"`
 }
 
 func newVersionCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command {
@@ -36,6 +41,8 @@ func newVersionCmd(printer func(*cobra.Command) *output.Printer) *cobra.Command 
 				Go:      runtime.Version(),
 				OS:      runtime.GOOS,
 				Arch:    runtime.GOARCH,
+
+				SchemaVersion: schemaVersion,
 			}
 			return printer(cmd).Result(info, func(w io.Writer) {
 				fmt.Fprintf(w, "jingle %s (%s, %s, %s/%s)\n", info.Version, info.Commit, info.Go, info.OS, info.Arch)

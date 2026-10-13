@@ -1,0 +1,60 @@
+{
+  "exit": 1,
+  "stderr": {
+    "error": {
+      "code": "problems_found",
+      "message": "1 problem(s) need fixing"
+    }
+  },
+  "stdout": {
+    "chain_dir": "",
+    "config": {
+      "commit.enabled": true,
+      "commit.sounds": [
+        "$ROOT/jingle/sounds/commit-tag.wav"
+      ],
+      "cooldown": 3,
+      "enabled": true,
+      "merge.enabled": false,
+      "merge.sounds": [],
+      "push.enabled": true,
+      "push.sounds": [],
+      "push.when": "success",
+      "volume": 100
+    },
+    "config_path": "$ROOT/jingle/config.toml",
+    "git": {
+      "path": "<machine>",
+      "version": "<machine>"
+    },
+    "global_hooks_path": "$ROOT/jingle/hooks",
+    "hooks_dir": "$ROOT/jingle/hooks",
+    "installed": true,
+    "jingle_executable": "<machine>",
+    "jingle_path": "<machine>",
+    "player": {
+      "args": [],
+      "name": "JINGLE_PLAYER",
+      "path": "$ROOT/player",
+      "volume": false
+    },
+    "previous_hooks_path": null,
+    "problems": [
+      {
+        "code": "no_sound",
+        "fix": "jingle config set push.sounds <file>",
+        "message": "no sound set for push",
+        "severity": "error"
+      }
+    ],
+    "repo": {
+      "hooks_path": "$ROOT/jingle/hooks",
+      "hooks_path_scope": "global",
+      "husky": false,
+      "path": "$ROOT/repo"
+    },
+    "shims_current": true,
+    "state_installed": true,
+    "system_hooks_path": null
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "chain_dir": "",
+    "changes": [],
+    "hooks_dir": "$ROOT/jingle/hooks",
+    "previous_hooks_path": null,
+    "status": "unchanged"
+  }
+}

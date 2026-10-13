@@ -1,0 +1,10 @@
+{
+  "exit": 2,
+  "stderr": {
+    "error": {
+      "code": "invalid_key",
+      "message": "unknown config key \"nope\" (valid keys: enabled, cooldown, volume, commit.enabled, commit.sounds, push.enabled, push.sounds, push.when, merge.enabled, merge.sounds)"
+    }
+  },
+  "stdout": null
+}

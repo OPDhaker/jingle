@@ -1,0 +1,12 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "arch": "<machine>",
+    "commit": "<machine>",
+    "go": "<machine>",
+    "os": "<machine>",
+    "schema_version": 1,
+    "version": "<machine>"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "changed": false,
+    "key": "volume",
+    "value": 100
+  }
+}

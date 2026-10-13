@@ -1,0 +1,9 @@
+{
+  "exit": 0,
+  "stderr": null,
+  "stdout": {
+    "changed": true,
+    "key": "push.sounds",
+    "value": []
+  }
+}
