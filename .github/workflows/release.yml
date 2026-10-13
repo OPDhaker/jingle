@@ -28,3 +28,60 @@ jobs:
           # Fine-grained token with contents: write on OPDhaker/homebrew-tap
           # only (docs/releasing.md).
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  # The menu-bar app (gui/): one universal .dmg (Apple Silicon + Intel),
+  # uploaded to the release GoReleaser just created, plus Casks/jingle-app.rb
+  # in the tap. Ad-hoc signed, not notarized (docs/releasing.md).
+  app:
+    needs: release
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: gui
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: gui/pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: gui/src-tauri
+      - run: pnpm install --frozen-lockfile
+      # The tag sets the app's version; tauri.conf.json's is the dev default.
+      - name: Build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pnpm tauri build --target universal-apple-darwin --bundles dmg --config "{\"version\":\"$version\"}"
+          # No version in the name, so releases/latest/download/<name> always works.
+          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg Jingle_macos_universal.dmg
+      - name: Upload to the release
+        run: gh release upload "$GITHUB_REF_NAME" Jingle_macos_universal.dmg --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Pre-releases (v0.2.0-rc.1) don't update the tap, same as the CLI cask.
+      - name: Update the Homebrew cask
+        if: ${{ !contains(github.ref_name, '-') }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          sha=$(shasum -a 256 Jingle_macos_universal.dmg | cut -d' ' -f1)
+          git clone --depth 1 "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/OPDhaker/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          ../scripts/app-cask.sh "$version" "$sha" > "$RUNNER_TEMP/tap/Casks/jingle-app.rb"
+          cd "$RUNNER_TEMP/tap"
+          git config user.name goreleaserbot
+          git config user.email bot@goreleaser.com
+          git add Casks/jingle-app.rb
+          # A re-run for the same tag leaves the cask unchanged.
+          if ! git diff --cached --quiet; then
+            git commit -m "Brew cask update for jingle-app version $version"
+            git push
+          fi
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

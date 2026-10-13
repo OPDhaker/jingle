@@ -97,14 +97,24 @@ Try a sound before picking it with `jingle preview builtin:boom` or `jingle prev
 
 It is a front end for the CLI and has no logic of its own. Every change runs a `jingle` command, and changes made in a terminal show up in the app within a couple of seconds. It needs the CLI installed. It finds it the way your shell does, or uses `$JINGLE_BIN` if that's set.
 
-It isn't released yet. Build it yourself (needs Rust and pnpm):
+**Homebrew** (macOS; also installs the CLI):
+
+```sh
+brew install --cask OPDhaker/tap/jingle-app
+```
+
+**Download**: [`Jingle_macos_universal.dmg`](https://github.com/OPDhaker/jingle/releases/latest/download/Jingle_macos_universal.dmg) (Apple Silicon and Intel), then drag Jingle to Applications. Install the CLI too (see [Install](#install)).
+
+The app isn't notarized by Apple yet, so the first time you open the downloaded copy, macOS says it can't verify it. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**. You only do this once. The Homebrew install doesn't need it.
+
+To build it yourself (needs Rust and pnpm):
 
 ```sh
 make gui-build    # → gui/src-tauri/target/release/bundle/macos/Jingle.app
 make gui-dev      # run it with hot reload
 ```
 
-macOS is tested. Linux builds in CI but hasn't been tried by hand.
+Releases are macOS only. Linux builds in CI but hasn't been tried by hand.
 
 ## Uninstall
 
@@ -115,8 +125,9 @@ jingle uninstall --yes --purge
 That restores your global git config exactly as it was before `jingle install`, removes jingle's hooks, and (with `--purge`) deletes its config and imported sounds. Without `--purge`, your config and sounds are kept for a later reinstall. Then remove the binary:
 
 ```sh
-brew uninstall jingle       # Homebrew
-rm ~/.local/bin/jingle      # install script
+brew uninstall --cask jingle-app   # menu-bar app, if installed
+brew uninstall jingle              # Homebrew
+rm ~/.local/bin/jingle             # install script
 ```
 
 **If you delete the binary without running `jingle uninstall` first**, git keeps working: the hooks skip the sound and still run your own hooks. To clean up afterwards, `git config --global --unset core.hooksPath` turns jingle's hooks off (if you had your own global `core.hooksPath` before, set it back instead), and `rm -rf ~/.config/jingle ~/.local/share/jingle` removes the rest.

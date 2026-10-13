@@ -77,7 +77,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: shellcheck install.sh scripts/e2e-clean-machine.sh scripts/linux-player-smoke/smoke.sh
+      - run: shellcheck install.sh scripts/app-cask.sh scripts/e2e-clean-machine.sh scripts/linux-player-smoke/smoke.sh
 
   # Builds the release as GoReleaser would (snapshot, nothing published), then
   # installs it on a clean HOME through install.sh and checks the full
