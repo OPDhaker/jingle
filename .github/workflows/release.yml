@@ -25,6 +25,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The tag that triggered this run. Without it GoReleaser picks one of
+          # the tags on the commit itself, and v0.1.0-rc.2 sorts after v0.1.0.
+          GORELEASER_CURRENT_TAG: ${{ github.ref_name }}
           # Fine-grained token with contents: write on OPDhaker/homebrew-tap
           # only (docs/releasing.md).
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
