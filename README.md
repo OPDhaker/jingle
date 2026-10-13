@@ -11,6 +11,8 @@ Install it once and it works in every repo on your machine, with no per-repo set
 
 macOS and Linux. (Windows is planned, not supported yet.)
 
+**Website:** [opdhaker.github.io/jingle](https://opdhaker.github.io/jingle/)
+
 ## Install
 
 **Homebrew** (macOS and Linux):

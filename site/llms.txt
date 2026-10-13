@@ -1,0 +1,87 @@
+# jingle
+
+> jingle is a free, open-source (MIT) command-line tool that plays a short sound, a music "producer tag", when you run `git commit` or `git push`. Install it once and it works in every git repo on the machine, with no per-repo setup. It runs on macOS and Linux, and there is a menu-bar app for macOS. Current version: 0.1.1.
+
+- Website: https://opdhaker.github.io/jingle/
+- Source: https://github.com/OPDhaker/jingle
+- Written in Go. Windows is planned, not supported yet.
+
+## What it does
+
+- Plays a sound on every commit (default: `chime`), on every successful push (default: `fanfare`), and, if you turn it on, on merge commits (default: `harmony`).
+- Global and set up once: `jingle install` points git's global `core.hooksPath` at jingle's hooks. There's nothing to set up or commit in each repo, and no background process.
+- Your hooks keep running: every repo's own hooks (lint, tests) still run with the same arguments, input, and exit codes.
+- The push sound plays only after the push actually goes through. Rejected pushes and "Everything up-to-date" stay silent.
+- Rebases, cherry-picks, and reverts don't play a sound for each replayed commit.
+- Never slows git down: the sound plays in the background and adds a few tens of milliseconds per commit.
+- `jingle uninstall` puts your global git config back byte for byte, exactly as it was before.
+- Four built-in sounds synthesized in code (chime, fanfare, harmony, boom), or use your own mp3, wav, aiff, m4a, ogg, or flac files.
+
+## Install
+
+Homebrew (macOS and Linux):
+
+```sh
+brew trust opdhaker/tap
+brew install OPDhaker/tap/jingle
+jingle install --yes
+```
+
+`brew trust` is a one-time step Homebrew 7 asks for with any third-party tap.
+
+Install script (puts the binary in `~/.local/bin`, no sudo, checks the sha256):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/OPDhaker/jingle/main/install.sh | sh
+jingle install --yes
+```
+
+Go 1.25+:
+
+```sh
+go install github.com/OPDhaker/jingle/cmd/jingle@latest
+jingle install --yes
+```
+
+Mac menu-bar app (also installs the CLI):
+
+```sh
+brew trust opdhaker/tap
+brew install --cask OPDhaker/tap/jingle-app
+```
+
+Or download the app (Apple Silicon and Intel, macOS 11+): https://github.com/OPDhaker/jingle/releases/latest/download/Jingle_macos_universal.dmg
+
+## Common commands
+
+```sh
+jingle play commit                                 # check the audio without committing
+jingle doctor                                      # report anything that would stop a sound
+jingle config set commit.sounds ~/Music/my-tag.mp3 # use your own sound (jingle keeps a copy)
+jingle config add commit.sounds ~/Music/tag2.wav   # several sounds: one plays at random
+jingle config set push.sounds builtin:boom         # use a built-in sound
+jingle config set volume 60
+jingle config set merge.enabled true               # turn on the merge sound
+jingle config set enabled false                    # mute everything; hooks stay installed
+jingle uninstall --yes --purge                     # restore git config and remove everything
+```
+
+## For AI agents
+
+Every command takes `--json`, never prompts (`--yes` confirms), uses stable exit codes (0 ok, 1 error, 2 usage), and is safe to run twice. `jingle skill` prints a setup guide for agents that matches the installed version. `jingle schema` describes every command, setting, and error code as JSON. Claude Code plugin: `/plugin install jingle --marketplace OPDhaker/jingle`.
+
+## FAQ
+
+- Does it work in every repo? Yes, except repos that set their own `core.hooksPath` (husky and similar tools), which override jingle. `jingle doctor`, run inside the repo, tells you when this happens.
+- How do I mute it? `jingle config set enabled false`. To mute only pushes: `jingle config set push.enabled false`.
+- Will it play in CI or on a server? Only if the machine has an audio player. Headless machines usually don't, so it stays silent.
+- What does it need? macOS (uses the built-in `afplay`) or Linux (`pw-play`, `paplay`, `aplay`, or `ffplay`), and git. Detecting a successful push needs git 2.28 or newer; on older git, the push sound plays when the push starts.
+- Why does macOS say it can't verify the Jingle app? The app isn't notarized yet. On first open, go to System Settings → Privacy & Security and click Open Anyway, once. Installing with Homebrew avoids this.
+- What if I delete the binary without uninstalling? git keeps working. The hooks skip the sound and still run your own hooks.
+
+## Docs
+
+- [README](https://github.com/OPDhaker/jingle#readme): install, configuration, built-in sounds, how it works, limits
+- [JSON output contract](https://github.com/OPDhaker/jingle/blob/main/docs/json.md): the `--json` schema, error codes, problem codes
+- [Agent skill](https://github.com/OPDhaker/jingle/blob/main/plugin/skills/jingle/SKILL.md): how an AI agent should install and configure jingle
+- [Releases](https://github.com/OPDhaker/jingle/releases/latest): binaries, checksums, and the Mac app

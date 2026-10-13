@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>jingle: play a sound on every git commit and push</title>
+  <meta name="description" content="jingle plays a producer tag when you git commit or git push. Install once with Homebrew and it works in every repo. Free, open-source CLI and Mac app for macOS and Linux.">
+  <link rel="canonical" href="https://opdhaker.github.io/jingle/">
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+  <meta name="author" content="OPDhaker">
+  <meta name="application-name" content="jingle">
+  <meta name="apple-mobile-web-app-title" content="jingle">
+  <meta name="theme-color" content="#EFEDE3">
+
+  <!-- Social cards -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="jingle">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:url" content="https://opdhaker.github.io/jingle/">
+  <meta property="og:title" content="jingle: play a sound on every git commit and push">
+  <meta property="og:description" content="A producer tag on every git commit and git push. Install it once and it works in every repo. Free and open source, for macOS and Linux.">
+  <meta property="og:image" content="https://opdhaker.github.io/jingle/og.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="jingle: Let the room know you shipped! A producer tag on every git commit and git push.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="jingle: play a sound on every git commit and push">
+  <meta name="twitter:description" content="A producer tag on every git commit and git push. Install it once and it works in every repo.">
+  <meta name="twitter:image" content="https://opdhaker.github.io/jingle/og.png">
+  <meta name="twitter:image:alt" content="jingle: Let the room know you shipped! A producer tag on every git commit and git push.">
+
+  <!-- Icons -->
+  <link rel="icon" href="favicon.ico" sizes="48x48">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Plain-text summary for LLMs and AI search (llmstxt.org) -->
+  <link rel="alternate" type="text/markdown" href="llms.txt" title="jingle summary for LLMs">
+  <link rel="sitemap" type="application/xml" href="sitemap.xml">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://opdhaker.github.io/jingle/#website",
+        "url": "https://opdhaker.github.io/jingle/",
+        "name": "jingle",
+        "description": "A producer tag on every git commit and git push.",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "Person",
+        "@id": "https://github.com/OPDhaker#person",
+        "name": "OPDhaker",
+        "url": "https://github.com/OPDhaker"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://opdhaker.github.io/jingle/#app",
+        "name": "jingle",
+        "alternateName": "jingle CLI",
+        "description": "jingle plays a short sound, a producer tag, when you git commit or git push. Install it once and it works in every repo. Your hooks keep running, and uninstall puts your git config back exactly as it was.",
+        "url": "https://opdhaker.github.io/jingle/",
+        "image": "https://opdhaker.github.io/jingle/og.png",
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "Git hooks",
+        "operatingSystem": "macOS, Linux",
+        "softwareVersion": "0.1.1",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "downloadUrl": "https://github.com/OPDhaker/jingle/releases/latest",
+        "installUrl": "https://github.com/OPDhaker/jingle#install",
+        "featureList": [
+          "Plays a sound on every git commit",
+          "Plays a sound on every successful git push",
+          "Optional sound on merge commits",
+          "Installed once globally via core.hooksPath, works in every repo",
+          "Existing repo hooks keep running with the same exit codes",
+          "Uninstall restores the git config byte for byte",
+          "Four built-in sounds, or your own mp3, wav, aiff, m4a, ogg, or flac",
+          "Menu-bar app for macOS",
+          "JSON output and no prompts, built for AI coding agents"
+        ],
+        "author": { "@id": "https://github.com/OPDhaker#person" },
+        "sameAs": ["https://github.com/OPDhaker/jingle"]
+      },
+      {
+        "@type": "SoftwareSourceCode",
+        "@id": "https://github.com/OPDhaker/jingle#code",
+        "name": "jingle",
+        "codeRepository": "https://github.com/OPDhaker/jingle",
+        "programmingLanguage": "Go",
+        "license": "https://opensource.org/licenses/MIT",
+        "author": { "@id": "https://github.com/OPDhaker#person" },
+        "targetProduct": { "@id": "https://opdhaker.github.io/jingle/#app" }
+      }
+    ]
+  }
+  </script>
+
+  <!-- SF Pro / SF Mono on Apple devices; Inter / JetBrains Mono everywhere else. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@700&family=JetBrains+Mono:wght@700&display=swap">
+
+  <link rel="preload" as="image" href="src/hero-img.webp" type="image/webp" fetchpriority="high">
+  <link rel="stylesheet" href="css/style.css">
+
+  <script>
+    // Hide animated nodes until GSAP takes over. If it never does (blocked
+    // CDN, script error), show everything after a short grace period.
+    document.documentElement.classList.add("js");
+    setTimeout(function () {
+      if (!window.__jingleAnim) document.documentElement.classList.remove("js");
+    }, 2500);
+  </script>
+</head>
+<body id="top">
+  <div class="page">
+
+    <!-- ========== 1. Nav ========== -->
+    <header class="nav">
+      <a class="nav__logo js-anim" href="#top" aria-label="jingle home">
+        <img src="src/logo.svg" width="64" height="64" alt="">
+      </a>
+      <a class="nav__link js-anim" href="https://github.com/OPDhaker/jingle#readme">Docs</a>
+      <div class="nav__end js-anim">
+        <a class="nav__github" href="https://github.com/OPDhaker/jingle" aria-label="jingle on GitHub">
+          <img src="src/github.svg" width="29" height="29" alt="" decoding="async">
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <!-- ========== 2. Hero ========== -->
+      <section class="hero" aria-labelledby="hero-title">
+        <figure class="hero__media js-anim">
+          <picture>
+            <source srcset="src/hero-img.webp" type="image/webp">
+            <img src="src/hero-img.png" width="832" height="832" fetchpriority="high" alt="A snarling white wolf, black-and-white photo.">
+          </picture>
+        </figure>
+
+        <div class="hero__content">
+          <div class="hero__intro">
+            <h1 id="hero-title" class="hero__title js-anim">Let the room know you shipped!</h1>
+            <p class="hero__sub js-anim">A producer tag on every <code>git commit</code> and <code>git push</code>. Install it once and it works in every repo.</p>
+          </div>
+
+          <div class="hero__actions">
+            <div class="codecard js-anim">
+              <pre class="codecard__body"><code id="install-cmd">brew trust opdhaker/tap
+brew install OPDhaker/tap/jingle
+jingle install --yes</code></pre>
+              <button class="codecard__copy" type="button" data-copy="#install-cmd" aria-label="Copy install commands">
+                <img class="icon-copy" src="src/lucide/copy.svg" width="24" height="24" alt="" decoding="async">
+                <svg class="icon-check" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M20 6 9 17l-5-5" stroke="#302F2C" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="divider js-anim" aria-hidden="true">
+              <span class="divider__rule"></span>
+              <span class="divider__or">or</span>
+              <span class="divider__rule"></span>
+            </div>
+
+            <div class="hero__cta js-anim">
+              <a class="btn btn--ink" href="https://github.com/OPDhaker/jingle/releases/latest/download/Jingle_macos_universal.dmg">
+                <span>Download</span>
+                <img src="src/apple.svg" width="24" height="24" alt="" decoding="async">
+                <span class="visually-hidden">the Mac app</span>
+              </a>
+            </div>
+          </div>
+
+          <p class="hero__note js-anim">macOS and Linux • Free and open source (MIT)</p>
+        </div>
+      </section>
+
+      <!-- ========== 3. Plays on ========== -->
+      <section class="plays" aria-labelledby="plays-title">
+        <div class="plays__panel">
+          <h2 id="plays-title" class="plays__title js-anim">Plays on</h2>
+          <ul class="plays__list" role="list">
+            <li class="js-anim">
+              <button class="pill" type="button" data-sound="src/sounds/chime.wav" aria-label="Play the commit sound (chime)">
+                <span class="pill__label">every commit</span>
+                <img class="pill__icon" src="src/lucide/git-commit-horizontal.svg" width="32" height="32" alt="" decoding="async">
+              </button>
+            </li>
+            <li class="js-anim">
+              <button class="pill" type="button" data-sound="src/sounds/fanfare.wav" aria-label="Play the push sound (fanfare)">
+                <span class="pill__label">every successful push</span>
+                <img class="pill__icon" src="src/lucide/git-pull-request-draft.svg" width="32" height="32" alt="" decoding="async">
+              </button>
+            </li>
+            <li class="js-anim">
+              <button class="pill" type="button" data-sound="src/sounds/harmony.wav" aria-label="Play the merge sound (harmony)">
+                <span class="pill__label">merge commits</span>
+                <img class="pill__icon" src="src/lucide/git-merge.svg" width="32" height="32" alt="" decoding="async">
+              </button>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <p class="visually-hidden" aria-live="polite" id="live"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/SplitText.min.js" defer></script>
+  <script src="js/main.js" defer></script>
+</body>
+</html>

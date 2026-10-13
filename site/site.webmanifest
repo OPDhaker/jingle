@@ -1,0 +1,15 @@
+{
+  "name": "jingle",
+  "short_name": "jingle",
+  "description": "A producer tag on every git commit and git push.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "browser",
+  "theme_color": "#EFEDE3",
+  "background_color": "#EFEDE3",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
