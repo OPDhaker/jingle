@@ -10,7 +10,7 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 
 ## Non-goals (for now)
 
-- GUI (Phase 5).
+- GUI packaging and release (Phase 5 built the app; shipping it comes later).
 - Per-repo configuration.
 - Sound on events other than commit, push, and (opt-in) merge.
 
@@ -105,12 +105,24 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
 - **Exit check:** passed. A fresh `claude -p` session was given only the plugin, in a sandbox (`XDG_*`, `GIT_CONFIG_GLOBAL`, a logging `JINGLE_PLAYER`), with the prompt "Set up jingle so I hear a sound when I commit and push". It took 9 turns and no human steps. Afterwards doctor was clean, a commit played chime and a push played fanfare, and the real `~/.gitconfig` and jingle config were byte-identical. `scripts/e2e-clean-machine.sh` now asserts that the built-ins play with no `config set`.
 - **Still open:** nobody has listened to the built-ins on Linux hardware. Tuning them by ear is welcome.
 
-## Phase 5: GUI
+## Phase 5: GUI ✅ built for macOS; packaging deferred
 
-- Tray / menu-bar app (Tauri suggested) over the core library or `jingle --json`; no duplicated logic.
-- Toggle on/off and per-event switches, pick and preview audio, install/uninstall, show `doctor` results.
+- ✅ Tray / menu-bar app (Tauri suggested) over the core library or `jingle --json`; no duplicated logic.
+- ✅ Toggle on/off and per-event switches, pick and preview audio, install/uninstall, show `doctor` results.
 
 **Exit:** everything the GUI does is also possible from the CLI, and both read and write the same config.
+
+**Result:**
+- **Stack.** Tauri v2 in `gui/`: Rust in `gui/src-tauri/`, plain TypeScript and Vite in `gui/src/`, no UI framework. The `.app` is 6.3 MB.
+- **Thin client.** The app runs the installed `jingle` CLI with `--json` for everything; `gui/src-tauri/src/jingle.rs` is the only code that talks to it. It doesn't ship its own copy of jingle. If it did, `install` would record a path inside the `.app` for the hooks to call, and moving or updating the app would break them. The window can call only a fixed set of commands (`commands.rs`), so it can't run arbitrary arguments such as `uninstall --purge`. Positional values go after `--`, so a file named `-x.mp3` can't be read as a flag.
+- **Finding jingle.** It uses `$JINGLE_BIN` if that's set (and reports a bad one rather than falling back). Otherwise it asks the login shell (`$SHELL -ilc 'command -v jingle'`), then tries Homebrew, `~/.local/bin`, and `~/go/bin`. An app launched from Finder gets a bare PATH, so jingle runs with the login shell's PATH and can still find git and the player. Checked by launching with `env -i PATH=/usr/bin:/bin`.
+- **One view of the state.** The window and tray both render one snapshot, which is `jingle status --json` plus a one-line summary. It refreshes after every change made from the app, whenever the window gains focus, and when the mtime of the config, `state.json`, the global gitconfig, or the jingle binary changes (checked every 1.5 s). A `jingle config set` or `jingle uninstall` typed in a terminal shows up in the app within about 2 s. If jingle is missing or failing, the app looks for it again every 6 s, so installing the CLI while the app is open just works.
+- **Changes to the CLI** (both additive, `schema_version` stays 1):
+  - `jingle preview <builtin:name|file> [--wait]` plays any sound at the configured volume without adding it anywhere, so the user can hear a sound before choosing it. `play --sound` only takes sounds already in the list.
+  - `jingle schema` now lists `sound_types` (accepted file extensions), so the file picker's filter comes from jingle instead of a copy in the app. Key ranges, `push.when` values, events, and built-ins also come from `schema`.
+- **Tray menu:** a summary line (On / Off / Not installed / On, N problems; click it to open settings), Sounds on, Commit / Push / Merge, Play ▸ event, Settings…, Quit. No Dock icon. Closing the window keeps the app running, and a second launch opens the existing window.
+- **Verified:** Rust unit tests cover locating jingle (in order), parsing output (result, error envelope, the doctor report on exit 1, non-JSON output) and timeouts. The settings UI was driven in Chrome through a stand-in for the Tauri bridge that ran the real CLI in a sandbox. Every control changed `config list` as expected, and play and preview reached the stub player with the right file. With the native app running in a sandbox, a CLI change refreshed it within 2 s, and an uninstall left the sandbox gitconfig byte-identical to before the install. **Not yet verified by hand:** the tray menu itself (the terminal had no screen-recording or accessibility permission), and Linux at all; CI builds and tests it on Ubuntu.
+- **Deferred:** packaging and release (dmg / cask / AppImage, signing, notarization) and launch at login. The app already accepts `--hidden`, which starts it in the menu bar only, for when launch at login is added.
 
 ---
 

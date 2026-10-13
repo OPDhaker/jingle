@@ -84,6 +84,23 @@ jingle play push --sound boom
 
 The config lives in `~/.config/jingle/config.toml`, and jingle's copies of your sounds in `~/.local/share/jingle/` (both honor `XDG_CONFIG_HOME` / `XDG_DATA_HOME`).
 
+Try a sound before picking it with `jingle preview builtin:boom` or `jingle preview ~/Music/tag.mp3`.
+
+## Menu-bar app
+
+`gui/` holds an optional menu-bar app (Tauri) for people who'd rather click than type. From the menu bar you can mute jingle, switch each event on or off, and play each event's sound. The settings window does everything else: install and uninstall, add, preview, and remove sounds, set the volume and cooldown, see `doctor` problems, and check a repo for husky.
+
+It is a front end for the CLI and has no logic of its own. Every change runs a `jingle` command, and changes made in a terminal show up in the app within a couple of seconds. It needs the CLI installed. It finds it the way your shell does, or uses `$JINGLE_BIN` if that's set.
+
+It isn't released yet. Build it yourself (needs Rust and pnpm):
+
+```sh
+make gui-build    # → gui/src-tauri/target/release/bundle/macos/Jingle.app
+make gui-dev      # run it with hot reload
+```
+
+macOS is tested. Linux builds in CI but hasn't been tried by hand.
+
 ## Uninstall
 
 ```sh
