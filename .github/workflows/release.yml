@@ -73,6 +73,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           sha=$(shasum -a 256 Jingle_macos_universal.dmg | cut -d' ' -f1)
           git clone --depth 1 "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/OPDhaker/homebrew-tap.git" "$RUNNER_TEMP/tap"
+          mkdir -p "$RUNNER_TEMP/tap/Casks"
           ../scripts/app-cask.sh "$version" "$sha" > "$RUNNER_TEMP/tap/Casks/jingle-app.rb"
           cd "$RUNNER_TEMP/tap"
           git config user.name goreleaserbot
