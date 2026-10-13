@@ -1,0 +1,83 @@
+# Release config. A pushed v* tag runs .github/workflows/release.yml, which
+# runs `goreleaser release --clean`. Local dry run:
+#   goreleaser release --snapshot --clean   # → dist/
+# macOS and Linux only for now; Windows is deferred (see PRD.md).
+version: 2
+
+project_name: jingle
+
+before:
+  hooks:
+    - go mod tidy -diff
+
+builds:
+  - id: jingle
+    main: ./cmd/jingle
+    binary: jingle
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -trimpath
+    # Same ldflags as the Makefile. .Version has no leading "v"; add it back
+    # so `jingle version` prints the tag.
+    ldflags:
+      - -s -w -X github.com/OPDhaker/jingle/internal/cli.version=v{{ .Version }}
+
+archives:
+  - id: jingle
+    formats: [tar.gz]
+    # No version in the name, so releases/latest/download/<name> always works
+    # (install.sh relies on it).
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+release:
+  extra_files:
+    - glob: ./install.sh
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Docs:"
+
+homebrew_casks:
+  - name: jingle
+    repository:
+      owner: OPDhaker
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: https://github.com/OPDhaker/jingle
+    description: Play a producer tag when you git commit or push
+    license: MIT
+    binaries: [jingle]
+    commit_author:
+      name: goreleaserbot
+      email: bot@goreleaser.com
+    # The binary isn't signed or notarized, and Homebrew quarantines cask
+    # downloads, so Gatekeeper would block it on first run.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/jingle"]
+          end
+    # No uninstall hook: casks run it on upgrade too, which would turn
+    # jingle off. Users run `jingle uninstall` themselves (see caveats).
+    caveats: |
+      jingle is installed but not turned on. To turn it on for every repo:
+        jingle install --yes
+        jingle config set commit.sounds /path/to/tag.mp3
+        jingle play commit
+
+      Before `brew uninstall jingle`, restore your git config and delete
+      jingle's config and sounds with:
+        jingle uninstall --yes --purge
