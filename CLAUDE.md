@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Phase 1 of `PRD.md` (MVP, macOS + Linux) is done: `install`, `uninstall`, `config list|get|set`, `play`, `status`, and the hidden `hook-event`, with integration tests against real git (`integration/`). Phase 2 is done except husky: the push sound plays only on a successful push (`push.when` config key), replayed commits (rebase, cherry-pick, revert) are silent, a per-event `cooldown` is in place, `doctor` reports every known failure mode, each event takes a list of sounds (`<event>.sounds`, one picked at random), `volume` sets playback volume, and an opt-in `merge` event plays for merge commits. Husky integration is deferred; the research is in `PRD.md` under "Husky findings" (short version: husky's `init.sh` doesn't work for most repos; git 2.54 config-based hooks are the likely route). Phase 0 decisions are below; spikes are in `spikes/` (findings in `spikes/README.md`). **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
+Phase 1 of `PRD.md` (MVP, macOS + Linux) is done: `install`, `uninstall`, `config list|get|set`, `play`, `status`, and the hidden `hook-event`, with integration tests against real git (`integration/`). Phase 2 is done except husky: the push sound plays only on a successful push (`push.when` config key), replayed commits (rebase, cherry-pick, revert) are silent, a per-event `cooldown` is in place, `doctor` reports every known failure mode, each event takes a list of sounds (`<event>.sounds`, one picked at random), `volume` sets playback volume, and an opt-in `merge` event plays for merge commits. Husky integration is deferred; the research is in `PRD.md` under "Husky findings" (short version: husky's `init.sh` doesn't work for most repos; git 2.54 config-based hooks are the likely route). Phase 3 is done for macOS + Linux: GoReleaser releases on `v*` tags, a Homebrew cask in `OPDhaker/homebrew-tap`, `install.sh`, `uninstall --purge`, and the published JSON contract (`docs/json.md`). Windows is deferred: don't add Windows work unless asked. Phase 0 decisions are below; spikes are in `spikes/` (findings in `spikes/README.md`). **Scope right now: CLI only.** A GUI comes later and must be a thin client over the same core and config. Don't build GUI code yet.
 
 ## Commands
 
@@ -15,7 +15,12 @@ go test ./internal/config -run TestResolvePaths   # single test
 go test ./integration/                      # builds bin, runs real git in a sandbox (skipped on Windows)
 make lint                                   # golangci-lint v2 (config: .golangci.yml)
 make fmt                                    # gofmt + goimports via golangci-lint
+go test ./internal/cli -run TestJSONGolden -update   # regenerate JSON golden files
+goreleaser release --snapshot --clean       # local release build → dist/, publishes nothing
+scripts/e2e-clean-machine.sh dist           # install.sh → install → play → uninstall --purge, temp HOME
 ```
+
+Linux player smoke test (Docker): `docker build -t jingle-smoke scripts/linux-player-smoke`, then run it with the scripts dir mounted at `/smoke` and a linux `dist/` binary at `/jingle` (see the header of `scripts/linux-player-smoke/smoke.sh`). Releasing: `docs/releasing.md`.
 
 If golangci-lint isn't installed: `go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest run`. CI (`.github/workflows/ci.yml`) runs tests and builds on macOS, Ubuntu, and Windows, plus lint.
 
@@ -44,6 +49,9 @@ If golangci-lint isn't installed: `go run github.com/golangci/golangci-lint/v2/c
 - Exit codes (`internal/output`): 0 ok, 1 error, 2 usage. Add new codes; never renumber existing ones.
 - Each command's cobra `Example:` field holds real invocations. Agents learn the tool from `--help`.
 - `cli.Run(args, stdout, stderr)` is the test entry point. CLI tests call it directly instead of building a binary.
+- `--json` output is a published contract (`docs/json.md`), pinned by `internal/cli/testdata/json/` golden files. Adding a field is fine: regenerate the golden files and document the field. Renaming, removing, or retyping a field also means bumping `schemaVersion` (`internal/cli/version.go`) and adding a "Schema history" entry.
+- `uninstall --purge` deletes only names jingle creates (`owned` in `internal/hooks/uninstall.go`) and removes a dir only when it's empty, because `JINGLE_HOME` can point anywhere.
+- `scripts/`: release e2e and Linux player smoke tests (shell, shellchecked in CI). `docs/`: user-facing reference.
 
 ## What this is
 
@@ -70,7 +78,7 @@ Prior art: [leomosley/tagthat](https://github.com/leomosley/tagthat) (Bun CLI) d
 - **`post-commit` fires once per replayed commit during `rebase` / `pull --rebase`** (when `$GIT_DIR/rebase-merge/` exists) and during `cherry-pick` (when `$GIT_DIR/CHERRY_PICK_HEAD` exists). It never fires for `merge` (git runs `post-merge` instead). The post-commit shim stays silent while `rebase-merge/`, `rebase-apply/`, `CHERRY_PICK_HEAD`, `REVERT_HEAD`, or `sequencer/` exists in the git dir. That check runs in `sh`, synchronously, because git deletes the state right after the last replayed commit, so a background `jingle` could miss it. Don't use `GIT_REFLOG_ACTION`; it's unreliable.
 - **Hooks must never block or break git.** Start playback detached and exit right away. The shim runs `jingle ... >/dev/null 2>&1 </dev/null &`; Go starts the player with `Setsid`, nil stdio, and `Process.Release()`. Measured with all 21 pass-through shims installed: 35–60 ms extra per commit on macOS, depending on the run (about 12 hooks fire per commit; most of the cost is `sh` startup). Phase 2's shim changes measured the same as Phase 1 side by side (about 60 ms that day). Shims locate the repo's hooks dir without forking `git` when they can, because a `git rev-parse` per hook roughly tripled that. On macOS the first run of each newly written shim is slow, once (OS scan of new executables). A synchronous player adds about 2.4 s. A hook's own logic always exits 0. The only non-zero exit allowed is one passed through from a chained user hook. A missing config, missing audio file, or missing player means skip silently.
 - **Hook scripts must be POSIX `sh`.** They run under Git for Windows' bundled sh as well as macOS and Linux shells. Keep them minimal: chain the user's hook, then start `jingle` in the background to handle the event. Only two things run synchronously in `sh`, both builtins only: `pre-push` writing the push marker, and `post-commit` checking for rebase/cherry-pick/revert state. If `jingle` is not on `PATH` (e.g. the user removed it without uninstalling), skip playback but still chain.
-- **Audio players by OS:** macOS `afplay` (verified). Linux: try `pw-play`, `paplay`, `aplay`, then `ffplay -nodisp -autoexit` (unverified). Volume below 100 adds `-v <0-1>` (afplay, verified), `--volume <0-1>` (pw-play), `--volume <0-65536>` (paplay), or `-volume <0-100>` (ffplay); aplay and `JINGLE_PLAYER` get no flag. Windows: PowerShell `System.Windows.Media.MediaPlayer` for MP3, `System.Media.SoundPlayer` for WAV only (unverified until Phase 3).
+- **Audio players by OS:** macOS `afplay` (verified). Linux: try `pw-play`, `paplay`, `aplay`, then `ffplay -nodisp -autoexit` (verified in a container with null outputs, not heard on hardware). Volume below 100 adds `-v <0-1>` (afplay, verified), `--volume <0-1>` (pw-play), `--volume <0-65536>` (paplay), or `-volume <0-100>` (ffplay); aplay and `JINGLE_PLAYER` get no flag. The Linux flags pass `scripts/linux-player-smoke`. Windows: PowerShell `System.Windows.Media.MediaPlayer` for MP3, `System.Media.SoundPlayer` for WAV only (unverified until Phase 3).
 
 ## Agent-first CLI
 

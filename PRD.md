@@ -70,14 +70,17 @@ Play a producer tag when you `git commit` / `git push`. Install once, globally; 
   - How should uninstall restore the gitconfig byte for byte (a new `[hook "jingle"]` section)?
 - Until then, `doctor` reports husky repos as `repo_hooks_path_override` with `repo.husky = true`. Older git (< 2.54) has no clean way in.
 
-## Phase 3: Windows + distribution
+## Phase 3: Distribution (macOS + Linux) ✅ done; Windows deferred
 
-- Windows playback and shims verified under Git for Windows.
-- Release CI: cross-platform binaries, checksums, semver.
-- Package channels: Homebrew, Scoop/winget, plus a one-line install script.
-- Publish the JSON output schema and exit-code table; schema changes are versioned.
+- Release CI: cross-platform binaries, checksums, semver. ✅ darwin/linux × amd64/arm64.
+- Package channels: Homebrew and a one-line install script. ✅
+- Publish the JSON output schema and exit-code table; schema changes are versioned. ✅
+- `uninstall --purge`, so one command leaves a clean machine. ✅
+- **Deferred:** Windows playback and shims under Git for Windows; Scoop/winget.
 
-**Exit:** clean-machine install → commit plays sound → uninstall, on all three OSes, through each package channel.
+**Exit (scoped to macOS + Linux):** clean-machine install → commit plays sound → uninstall, through each package channel.
+
+**Result:** a pushed `v*` tag runs GoReleaser (`.goreleaser.yaml`, `.github/workflows/release.yml`). It publishes versionless archives (`jingle_<os>_<arch>.tar.gz`), `checksums.txt`, and `install.sh` to the GitHub release, and a cask to `OPDhaker/homebrew-tap`. The cask clears quarantine (the binary is unsigned) and has no uninstall or zap hook: casks run uninstall hooks on upgrade, and a zap that removed the hooks dir would leave `core.hooksPath` pointing at nothing, silently disabling every repo's own hooks. `install.sh` checks the sha256, installs to `~/.local/bin` without sudo, and does not change git config. `uninstall --purge` also deletes the config and imported sounds, and removes the config/data dirs only when nothing else is in them. `docs/json.md` documents every command's JSON, the error, problem, and exit codes, and the versioning rule; `version --json` reports `schema_version` (1); golden tests (`internal/cli/testdata/json/`) pin every command's output. `scripts/e2e-clean-machine.sh` runs install.sh → install → commit and push play → `uninstall --purge` → gitconfig byte-identical with no files left; it passes on macOS and Ubuntu 24.04, and CI runs it on both. `scripts/linux-player-smoke` runs pw-play, paplay, aplay, and ffplay against null outputs in Docker: each is detected when alone on PATH and exits 0 with jingle's flags at volume 100 and 40. So the Linux command lines are verified, though nothing has been heard on real Linux hardware. The full test suite also passes on Linux. Still open: the first tagged release and the manual brew round trip (`docs/releasing.md`).
 
 ## Phase 4: Agent integration
 

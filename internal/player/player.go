@@ -1,6 +1,6 @@
 // Package player finds the OS audio player and starts it fully detached
 // (new session, null stdio, released process) so git never waits on playback.
-// macOS: afplay. Linux: pw-play, paplay, aplay, ffplay. Windows: Phase 3.
+// macOS: afplay. Linux: pw-play, paplay, aplay, ffplay. Windows: not supported yet.
 package player
 
 import (

@@ -40,6 +40,7 @@ checksum:
   algorithm: sha256
 
 release:
+  prerelease: auto # v0.2.0-rc.1 and the like
   extra_files:
     - glob: ./install.sh
 
@@ -59,6 +60,7 @@ homebrew_casks:
     description: Play a producer tag when you git commit or push
     license: MIT
     binaries: [jingle]
+    skip_upload: auto # pre-releases don't update the tap
     commit_author:
       name: goreleaserbot
       email: bot@goreleaser.com

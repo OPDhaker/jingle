@@ -54,5 +54,5 @@ Note: with a local path remote, the remote side's `receive-pack` also runs our g
 **Conclusion:** the detached launch adds roughly 10–30 ms, which is within the 50 ms budget, and most of that is the cost of having any hook at all (an empty `exit 0` hook measured the same). Git does not wait on the player. The Go launcher alone takes about 4 ms. Played audibly once on macOS.
 
 **Not verified here** (Docker/OrbStack daemon was not running):
-- Linux: player detection order `pw-play` → `paplay` → `aplay` → `ffplay -nodisp -autoexit`. Verify detached launch in the CI ubuntu job.
+- Linux: player detection order `pw-play` → `paplay` → `aplay` → `ffplay -nodisp -autoexit`. Phase 3: detached launch passes the integration tests on Linux, and each player runs with jingle's flags (volume 100 and 40) against null outputs in `scripts/linux-player-smoke`. Not yet heard on real hardware.
 - Windows: candidate `powershell -NoProfile -WindowStyle Hidden -Command "(New-Object System.Media.SoundPlayer '<wav>').PlaySync()"` handles WAV only. MP3 needs `System.Windows.Media.MediaPlayer` (PresentationCore) with a sleep loop. Detach with `CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS`. To be verified in Phase 3.

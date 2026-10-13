@@ -23,7 +23,7 @@ var jingleBin string
 
 func TestMain(m *testing.M) {
 	if runtime.GOOS == "windows" {
-		fmt.Println("integration tests need POSIX sh hooks; Windows support is Phase 3")
+		fmt.Println("integration tests need POSIX sh hooks; Windows is not supported yet")
 		os.Exit(0)
 	}
 	dir, err := os.MkdirTemp("", "jingle-it-bin")

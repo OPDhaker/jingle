@@ -49,7 +49,7 @@ func TestShimsAreValidShAndManaged(t *testing.T) {
 // unless a push is marked it must hand off to the user's hook untouched.
 func TestReferenceTransactionFastPath(t *testing.T) {
 	if runtime.GOOS == "windows" {
-		t.Skip("running shims under Git for Windows is verified in Phase 3")
+		t.Skip("running shims under Git for Windows is not verified yet (Windows is deferred)")
 	}
 	sh, err := exec.LookPath("sh")
 	if err != nil {

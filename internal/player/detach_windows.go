@@ -11,7 +11,7 @@ const (
 )
 
 // detach starts the player without a console, in its own process group.
-// Unverified until Phase 3.
+// Unverified: Windows support is deferred.
 func detach(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: createNewProcessGroup | detachedProcess}
 }
