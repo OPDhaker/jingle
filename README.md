@@ -116,12 +116,12 @@ Prefer clicking? The Jingle menu-bar app does everything the CLI does.
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/settings-dark.png">
-    <img src="docs/images/settings-light.png" width="420" alt="Jingle settings window: switches for commit, push, and merge, each event's sounds with play buttons, and volume.">
+    <img src="docs/images/settings-light.png" width="420" align="top" alt="Jingle settings window: switches for commit, push, and merge, each event's sounds with play buttons, and volume.">
   </picture>
   &nbsp;&nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/images/tray-dark.png">
-    <img src="docs/images/tray-light.png" width="204" alt="Jingle menu-bar menu: Sounds on, Commit, Push, Merge, Play, Settings, Quit.">
+    <img src="docs/images/tray-light.png" width="136" align="top" alt="Jingle menu-bar menu: Sounds on, Commit, Push, Merge, Play, Settings, Quit.">
   </picture>
 </p>
 
